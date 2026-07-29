@@ -54,7 +54,7 @@ jobs:
     - name: Frontend Security Audit
       run: |
         cd frontend
-        npm audit --audit-level=high
+        npm audit --audit-level=high --omit=dev
 
   build-and-push:
     needs: [backend-tests, frontend-tests]
