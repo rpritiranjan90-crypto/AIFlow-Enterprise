@@ -1,58 +1,45 @@
 # syntax=docker/dockerfile:1.4
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+# ---------- Build Stage ----------
+FROM node:22-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci
+# Copy frontend package files
+COPY frontend/package*.json ./frontend/
 
-# Copy application files
+# Copy shared package
+COPY packages/shared-types ./packages/shared-types
+
+# Install frontend dependencies
+WORKDIR /app/frontend
+RUN npm install
+
+# Copy the entire repository
+WORKDIR /app
 COPY . .
 
-# Build application
+# Build frontend
+WORKDIR /app/frontend
 RUN npm run build
 
-# Stage 2: Runtime
-FROM nginx:alpine AS runtime
 
-# Copy build output to nginx html folder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# ---------- Runtime Stage ----------
+FROM nginx:alpine
 
-# Custom nginx config for SPA routing
-RUN echo 'server { \
-    listen 80; \
-    server_name localhost; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
-    } \
-    location /health { \
-        access_log off; \
-        return 200 "healthy\n"; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
-# Implement non-root execution for Nginx
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
-
-# Switch to non-root user
-USER nginx
+RUN printf 'server {\n\
+    listen 80;\n\
+    server_name localhost;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgrespassword@localhost:5432/aiflow_db"
-    REDIS_URL: str = "redis://localhost:6379/0"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgrespassword@postgres:5432/aiflow_db"
+    REDIS_URL: str = "redis://redis:6379/0"
 
     MAX_FAILED_LOGIN_ATTEMPTS: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15
