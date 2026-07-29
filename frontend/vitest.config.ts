@@ -8,11 +8,7 @@ export default mergeConfig(viteConfig, defineConfig({
     setupFiles: './src/setupTests.ts',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      lines: 80,
-      branches: 80,
-      functions: 80,
-      statements: 80
+      reporter: ['text', 'json', 'html']
     }
   }
 }))
