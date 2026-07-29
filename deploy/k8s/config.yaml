@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aiflow-secrets
+type: Opaque
+stringData:
+  # In a real environment, these would be managed by an external secrets manager
+  # (e.g. AWS Secrets Manager, HashiCorp Vault, Azure Key Vault)
+  POSTGRES_USER: aiflow
+  POSTGRES_PASSWORD: secure_database_password
+  POSTGRES_DB: aiflow
+  JWT_SECRET: super_secret_jwt_key_that_should_be_rotated
+  API_KEY_SALT: random_api_key_salt
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aiflow-config
+data:
+  ENVIRONMENT: "production"
+  DATABASE_URL: "postgresql+asyncpg://aiflow:secure_database_password@postgres:5432/aiflow"
+  REDIS_URL: "redis://redis:6379/0"
+  CORS_ORIGINS: "https://aiflow.enterprise.internal"
+  LOG_LEVEL: "INFO"

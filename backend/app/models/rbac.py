@@ -24,7 +24,7 @@ class UserWorkspaceRole(Base):
     __tablename__ = "user_workspace_roles"
 
     id = Column(String, primary_key=True, default=lambda: f"uwr_{uuid.uuid4().hex[:12]}")
-    user_id = Column(String, ForeignKey("users.id", index=True), nullable=False)
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False)
     role_id = Column(String, ForeignKey("roles.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

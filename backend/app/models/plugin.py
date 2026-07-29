@@ -51,7 +51,7 @@ class PluginInstallation(Base):
     __tablename__ = "plugin_installations"
 
     id = Column(String, primary_key=True, default=lambda: f"pinst_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     plugin_id = Column(String, ForeignKey("plugins.id"), nullable=False)
     version = Column(String, nullable=False)
     installed_at = Column(DateTime, default=datetime.utcnow)

@@ -61,7 +61,7 @@ class CostRecord(Base):
     __tablename__ = "cost_records"
 
     id = Column(String, primary_key=True, default=lambda: f"cst_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     workflow_id = Column(String, nullable=True, index=True)
     agent_id = Column(String, nullable=True, index=True)
     provider = Column(String, nullable=False, default="OpenAI")
@@ -74,7 +74,7 @@ class GovernancePolicy(Base):
     __tablename__ = "governance_policies"
 
     id = Column(String, primary_key=True, default=lambda: f"gov_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     max_monthly_spend = Column(Float, default=5000.0)
     max_token_limit = Column(Integer, default=100000000)
     require_human_approval = Column(Boolean, default=True)

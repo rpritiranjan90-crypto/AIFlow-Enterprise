@@ -10,8 +10,8 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(String, primary_key=True, default=lambda: f"key_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False)
-    user_id = Column(String, ForeignKey("users.id", index=True), nullable=False)
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
     name = Column(String, nullable=False)
     key_prefix = Column(String, nullable=False)
     hashed_key = Column(String, nullable=False)

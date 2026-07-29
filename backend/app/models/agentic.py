@@ -37,7 +37,7 @@ class AgentMemory(Base):
     __tablename__ = "agentic_agent_memories"
 
     id = Column(String, primary_key=True, default=lambda: f"mem_{uuid.uuid4().hex[:12]}")
-    agent_id = Column(String, ForeignKey("agentic_agents.id", index=True), nullable=False)
+    agent_id = Column(String, ForeignKey("agentic_agents.id"), index=True, nullable=False)
     memory_type = Column(String, default="semantic")  # semantic, episodic, workspace, conversation
     content = Column(Text, nullable=False)
     embedding_hash = Column(String, nullable=True)
@@ -76,7 +76,7 @@ class AgentExecution(Base):
 
     id = Column(String, primary_key=True, default=lambda: f"aexec_{uuid.uuid4().hex[:12]}")
     plan_id = Column(String, ForeignKey("agentic_agent_plans.id"), nullable=False)
-    agent_id = Column(String, ForeignKey("agentic_agents.id", index=True), nullable=False)
+    agent_id = Column(String, ForeignKey("agentic_agents.id"), index=True, nullable=False)
     step_index = Column(Integer, default=0)
     step_name = Column(String, nullable=True)
     result_summary = Column(Text, nullable=True)
@@ -91,7 +91,7 @@ class AgentReasoning(Base):
     __tablename__ = "agentic_agent_reasonings"
 
     id = Column(String, primary_key=True, default=lambda: f"rsn_{uuid.uuid4().hex[:12]}")
-    execution_id = Column(String, ForeignKey("agentic_agent_executions.id", index=True), nullable=False)
+    execution_id = Column(String, ForeignKey("agentic_agent_executions.id"), index=True, nullable=False)
     reasoning_trace = Column(Text, nullable=False)
     reflection = Column(Text, nullable=True)
     critique = Column(Text, nullable=True)

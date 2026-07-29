@@ -23,7 +23,7 @@ class SaaSWorkspace(Base):
     __tablename__ = "saas_workspaces"
 
     id = Column(String, primary_key=True, default=lambda: f"sws_{uuid.uuid4().hex[:12]}")
-    tenant_id = Column(String, ForeignKey("saas_tenants.id", index=True), nullable=False)
+    tenant_id = Column(String, ForeignKey("saas_tenants.id"), index=True, nullable=False)
     name = Column(String, nullable=False)
     type = Column(String, default="production")  # development, staging, production
     status = Column(String, default="active", index=True)
@@ -69,7 +69,7 @@ class SaaSCostRecord(Base):
     __tablename__ = "saas_cost_records"
 
     id = Column(String, primary_key=True, default=lambda: f"scost_{uuid.uuid4().hex[:12]}")
-    tenant_id = Column(String, ForeignKey("saas_tenants.id", index=True), nullable=False)
+    tenant_id = Column(String, ForeignKey("saas_tenants.id"), index=True, nullable=False)
     resource_type = Column(String, nullable=False)  # compute, storage, bandwidth, ai_inference
     amount_usd = Column(Float, default=0.0)
     month = Column(String, nullable=False)  # YYYY-MM
@@ -81,7 +81,7 @@ class SaaSUsageRecord(Base):
     __tablename__ = "saas_usage_records"
 
     id = Column(String, primary_key=True, default=lambda: f"susage_{uuid.uuid4().hex[:12]}")
-    tenant_id = Column(String, ForeignKey("saas_tenants.id", index=True), nullable=False)
+    tenant_id = Column(String, ForeignKey("saas_tenants.id"), index=True, nullable=False)
     metric_type = Column(String, nullable=False)  # api_calls, storage_gb, active_users, workflows_executed
     value = Column(Float, default=0.0)
     timestamp = Column(DateTime, default=datetime.utcnow)

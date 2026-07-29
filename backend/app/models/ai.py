@@ -10,7 +10,7 @@ class PromptTemplate(Base):
     __tablename__ = "prompt_templates"
 
     id = Column(String, primary_key=True, default=lambda: f"pmpt_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     name = Column(String, nullable=False)
     category = Column(String, default="General") # Agent, Summarizer, Classifier, System
     system_prompt = Column(Text, nullable=False)
@@ -23,7 +23,7 @@ class KnowledgeBase(Base):
     __tablename__ = "knowledge_bases"
 
     id = Column(String, primary_key=True, default=lambda: f"kb_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     tags = Column(String, default="Documentation,Engineering")
@@ -57,7 +57,7 @@ class AgentSession(Base):
     __tablename__ = "agent_sessions"
 
     id = Column(String, primary_key=True, default=lambda: f"sess_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     agent_name = Column(String, nullable=False, default="Autonomous Enterprise Assistant")
     model = Column(String, default="gpt-4o")
     status = Column(String, default="idle", index=True)
@@ -67,7 +67,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(String, primary_key=True, default=lambda: f"msg_{uuid.uuid4().hex[:12]}")
-    session_id = Column(String, ForeignKey("agent_sessions.id", index=True), nullable=False)
+    session_id = Column(String, ForeignKey("agent_sessions.id"), index=True, nullable=False)
     role = Column(String, nullable=False) # user, assistant, system, tool
     content = Column(Text, nullable=False)
     citations_json = Column(Text, nullable=True)

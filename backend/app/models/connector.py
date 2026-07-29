@@ -24,7 +24,7 @@ class InstalledConnector(Base):
     __tablename__ = "installed_connectors"
 
     id = Column(String, primary_key=True, default=lambda: f"inst_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     connector_id = Column(String, ForeignKey("connector_definitions.id"), nullable=False)
     name = Column(String, nullable=False)
     status = Column(String, default="connected", index=True) # connected, expired, error, disconnected

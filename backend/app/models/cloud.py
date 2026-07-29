@@ -50,7 +50,7 @@ class Backup(Base):
     __tablename__ = "backups"
 
     id = Column(String, primary_key=True, default=lambda: f"bak_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     backup_type = Column(String, default="Snapshot") # Snapshot, Full, Incremental
     size_bytes = Column(Integer, default=4200000000)
     status = Column(String, default="completed", index=True)
@@ -86,7 +86,7 @@ class TenantRegion(Base):
     __tablename__ = "tenant_regions"
 
     id = Column(String, primary_key=True, default=lambda: f"tr_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False)
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False)
     primary_region = Column(String, nullable=False, default="us-east-1")
     replica_region = Column(String, nullable=False, default="eu-central-1")
 

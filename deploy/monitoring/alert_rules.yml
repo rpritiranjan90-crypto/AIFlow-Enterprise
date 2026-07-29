@@ -1,0 +1,47 @@
+groups:
+- name: aiflow-alerts
+  rules:
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: High HTTP error rate
+      description: "More than 5% of requests are returning 5xx errors over the last 5 minutes."
+
+  - alert: HighLatency
+    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: High API Latency
+      description: "95th percentile latency is greater than 500ms."
+
+  - alert: DatabaseDown
+    expr: pg_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: PostgreSQL Database is down
+      description: "PostgreSQL exporter is reporting the database is inaccessible."
+
+  - alert: RedisDown
+    expr: redis_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: Redis is down
+      description: "Redis exporter is reporting the cache/broker is inaccessible."
+
+  - alert: PodCrashLooping
+    expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: Pod is crash looping
+      description: "Pod {{ $labels.pod }} is repeatedly crashing."

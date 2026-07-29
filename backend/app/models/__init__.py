@@ -215,7 +215,7 @@ __all__ = [
     "IndustrySolution", "DeploymentTemplate", "TemplateVersion", "IndustryConnector",
     "IndustryRoleTemplate", "CompliancePack", "IndustryKnowledgeBase",
     "IndustryCopilot", "SolutionDeployment", "IndustryWorkflow",
-    "CommunityPublisher", "DeveloperProfile", "MarketplacePackage", "EcosystemPackageVersion",
+    "DeveloperProfile", "MarketplacePackage",
     "Certification", "Installation", "MarketplaceReview", "MarketplaceRevenue", "PackageVersion",
     "EnterpriseGraph", "PlatformNode", "PlatformRelationship", "GlobalSearchIndex",
     "EnterpriseTwin", "PredictiveInsight", "PlatformSnapshot", "PlatformRelease",

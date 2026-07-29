@@ -25,3 +25,13 @@ ignore = [
     "F403",  # star imports
     "F841",  # unused local variables
 ]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80

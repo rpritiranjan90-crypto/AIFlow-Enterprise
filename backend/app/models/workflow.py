@@ -10,7 +10,7 @@ class Workflow(Base):
     __tablename__ = "workflows"
 
     id = Column(String, primary_key=True, default=lambda: f"wf_{uuid.uuid4().hex[:12]}")
-    workspace_id = Column(String, ForeignKey("workspaces.id", index=True), nullable=False, default="ws_prod_01")
+    workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     version = Column(String, default="1.0.0")
@@ -24,7 +24,7 @@ class WorkflowNode(Base):
     __tablename__ = "workflow_nodes"
 
     id = Column(String, primary_key=True, default=lambda: f"node_{uuid.uuid4().hex[:12]}")
-    workflow_id = Column(String, ForeignKey("workflows.id", index=True), nullable=False)
+    workflow_id = Column(String, ForeignKey("workflows.id"), index=True, nullable=False)
     node_type = Column(String, nullable=False) # e.g. 'manual_trigger', 'ai_agent', 'webhook'
     name = Column(String, nullable=False)
     position_x = Column(Float, default=0.0)
@@ -35,7 +35,7 @@ class WorkflowEdge(Base):
     __tablename__ = "workflow_edges"
 
     id = Column(String, primary_key=True, default=lambda: f"edge_{uuid.uuid4().hex[:12]}")
-    workflow_id = Column(String, ForeignKey("workflows.id", index=True), nullable=False)
+    workflow_id = Column(String, ForeignKey("workflows.id"), index=True, nullable=False)
     source_node_id = Column(String, nullable=False)
     source_handle = Column(String, nullable=True)
     target_node_id = Column(String, nullable=False)
@@ -45,7 +45,7 @@ class WorkflowVersion(Base):
     __tablename__ = "workflow_versions"
 
     id = Column(String, primary_key=True, default=lambda: f"ver_{uuid.uuid4().hex[:12]}")
-    workflow_id = Column(String, ForeignKey("workflows.id", index=True), nullable=False)
+    workflow_id = Column(String, ForeignKey("workflows.id"), index=True, nullable=False)
     version_number = Column(String, nullable=False)
     graph_json = Column(Text, nullable=False)
     notes = Column(String, nullable=True)
