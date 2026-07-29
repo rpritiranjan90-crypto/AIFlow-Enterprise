@@ -1,0 +1,13 @@
+apiVersion: v2
+name: aiflow-enterprise
+description: Production Multi-Region Helm Chart for AIFlow Enterprise
+type: application
+version: 1.0.0
+appVersion: "2026.1"
+dependencies:
+  - name: postgresql-ha
+    version: 11.2.0
+    repository: https://charts.bitnami.com/bitnami
+  - name: redis
+    version: 17.3.0
+    repository: https://charts.bitnami.com/bitnami

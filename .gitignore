@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Coverage
+coverage
+.pytest_cache
+.htmlcov
+
+# Production & Builds
+dist
+build
+.next
+.out
+
+# Environment & Local Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Editor & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.dockerdata

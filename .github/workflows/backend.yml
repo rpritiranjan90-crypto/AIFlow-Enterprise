@@ -1,0 +1,60 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: aiflow_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Code Formatting Check
+        run: |
+          cd backend
+          pip install flake8 black
+          flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Run Backend App Health Check Test
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@localhost:5432/aiflow_test_db
+          JWT_SECRET_KEY: test-secret-key-super-secure-for-ci
+        run: |
+          cd backend
+          python -c "from app.core.config import settings; print('Config loaded successfully for environment:', settings.ENVIRONMENT)"

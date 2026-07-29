@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_BASE_URL=https://api.aiflow.enterprise.io
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://aiflow_user:aiflow_secure_pass_2026@postgres:5432/aiflow_prod
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=aiflow_enterprise_jwt_master_secret_key_2026
+    depends_on:
+      - postgres
+      - redis
+
+  celery_worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.tasks worker --loglevel=info -c 8
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://aiflow_user:aiflow_secure_pass_2026@postgres:5432/aiflow_prod
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_DB=aiflow_prod
+      - POSTGRES_USER=aiflow_user
+      - POSTGRES_PASSWORD=aiflow_secure_pass_2026
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

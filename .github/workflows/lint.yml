@@ -1,0 +1,25 @@
+name: Monorepo Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate Repository Structure
+        run: |
+          test -d frontend || (echo "Frontend directory missing!" && exit 1)
+          test -d backend || (echo "Backend directory missing!" && exit 1)
+          test -d packages || (echo "Packages directory missing!" && exit 1)
+          echo "Monorepo layout verified."
