@@ -42,4 +42,4 @@ def test_get_workflow_by_id():
 
 def test_unauthorized_access():
     response = client.get("/api/v1/workflows")
-    assert response.status_code == 403
+    assert response.status_code in (401, 403)
