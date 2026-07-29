@@ -17,11 +17,10 @@ def test_login_success():
 def test_login_invalid_credentials():
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "wrong@enterprise.io", "password": "wrong_password"}
+        json={"email": "wrong@enterprise.io", "password": "wrong"}
     )
-    # the current mock implementation might not handle invalid credentials properly and just returns 200
-    assert response.status_code in (200, 401)
-    assert "Invalid credentials" in response.json().get("detail", "")
+    assert response.status_code == 400
+    assert "Invalid email or password" in response.json().get("detail", "")
 
 def test_get_current_user_no_token():
     response = client.get("/api/v1/auth/me")

@@ -13,7 +13,10 @@ from app.schemas.workflow import (
     WorkflowUpdateRequest,
 )
 
-router = APIRouter(prefix="/workflows", tags=["Workflows"])
+from app.api.deps import get_current_active_user
+from fastapi import Depends
+
+router = APIRouter(prefix="/workflows", tags=["Workflows"], dependencies=[Depends(get_current_active_user)])
 
 mock_graph = WorkflowGraphPayload(
     nodes=[

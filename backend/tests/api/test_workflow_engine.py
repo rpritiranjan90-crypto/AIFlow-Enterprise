@@ -27,8 +27,7 @@ def test_create_workflow():
         json={
             "name": "Test Workflow",
             "description": "Integration test workflow",
-            "tags": ["test"],
-            "status": "draft"
+            "tags": "test"
         }
     )
     assert response.status_code == 200
@@ -43,4 +42,4 @@ def test_get_workflow_by_id():
 
 def test_unauthorized_access():
     response = client.get("/api/v1/workflows")
-    assert response.status_code == 403
+    assert response.status_code == 401
