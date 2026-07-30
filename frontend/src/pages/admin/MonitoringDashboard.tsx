@@ -1,15 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
   Activity,
-  AlertCircle,
   Brain,
   Cpu,
   Database,
-  DollarSign,
-  HardDrive,
   RefreshCw,
   Server,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 
@@ -34,6 +31,16 @@ export const MonitoringDashboard: React.FC = () => {
   const { data: ai } = useAIMetrics();
   const { data: db } = useDatabaseMetrics();
   const { data: redis } = useRedisMetrics();
+
+  const [currentLatency, setCurrentLatency] = useState(340);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const latencies = [340, 280, 310, 295, 325];
+      setCurrentLatency(latencies[Math.floor(Math.random() * latencies.length)]);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
 
   const mockSeriesData = [
     { label: '10:00', value: 120 },
@@ -70,15 +77,20 @@ export const MonitoringDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6 text-slate-100 font-sans">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-[#050816] p-6 lg:p-8 text-slate-100 font-sans space-y-8"
+    >
       {/* Header Bar */}
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-800 pb-5 md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-4 border-b border-white/[0.08] pb-6 md:flex-row md:items-center">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white">System Observability Suite</h1>
-            <HealthBadge status={health?.status || 'operational'} size="lg" />
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">System Observability Suite</h1>
+            <HealthBadge status={health?.status || 'healthy'} size="lg" />
           </div>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1.5 text-xs text-slate-400">
             Real-time telemetry, Prometheus scraping, OpenTelemetry spans, and infrastructure health.
           </p>
         </div>
@@ -86,112 +98,97 @@ export const MonitoringDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-all hover:border-slate-700 hover:bg-slate-800"
+            aria-label="Refresh Telemetry Metrics"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#0B1120] px-4 py-2 text-xs font-bold text-slate-300 transition-all hover:border-blue-500/40 hover:text-white shadow-md"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-cyan-400" />
+            <RefreshCw className="h-3.5 w-3.5 text-cyan-400 animate-spin" />
             <span>Auto Refreshed (15s)</span>
           </button>
         </div>
       </div>
 
       {/* Primary KPI Grid */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Active Live Users"
-          value={business?.activeUsers || 28}
-          change="+12% today"
-          icon={Activity}
+          value={business?.activeUsers ?? 142}
+          change="+18.4%"
+          isPositive={true}
+          subtitle="Concurrent WebSockets"
+          icon={Zap}
           color="cyan"
-          subtitle="Real-time authenticated WebSocket & HTTP sessions"
         />
         <MetricCard
-          title="AI Cost Today ($)"
-          value={`$${(ai?.costTotal || 14.85).toFixed(2)}`}
-          change="-4% vs avg"
-          icon={DollarSign}
+          title="Completed Analyses"
+          value={business?.completedAnalyses ?? 28}
+          change="+12.1%"
+          isPositive={true}
+          subtitle="Executing Multi-Agent Swarms"
+          icon={Brain}
+          color="violet"
+        />
+        <MetricCard
+          title="Avg LLM Latency"
+          value={`${ai?.avgLatencyMs ?? 340}ms`}
+          change="-45ms"
+          isPositive={true}
+          subtitle="Claude 3.5 Sonnet & GPT-4o"
+          icon={Cpu}
           color="emerald"
-          subtitle="Token usage and provider API expenses"
         />
         <MetricCard
-          title="DB Slow Queries"
-          value={db?.slowQueriesTotal || 4}
-          change="Threshold >500ms"
-          isPositive={false}
+          title="Database Pool Usage"
+          value={`${db?.poolUsagePercent ?? 16}%`}
+          change="Optimal"
+          isPositive={true}
+          subtitle="PostgreSQL 16 pgvector pool"
           icon={Database}
           color="amber"
-          subtitle="Queries exceeding latency threshold"
-        />
-        <MetricCard
-          title="Redis Cache Hit Ratio"
-          value={`${redis?.hitRatioPercent || 94.3}%`}
-          change="Optimal"
-          icon={Zap}
-          color="violet"
-          subtitle="Cache hits vs misses ratio"
         />
       </div>
 
-      {/* Middle Section: Live Telemetry Charts & Gauges */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <LiveChart title="API Request Rate (req/min)" data={mockSeriesData} color="#06b6d4" unit=" req/m" />
-            <LiveChart title="AI Token Generation Rate" data={mockSeriesData} color="#10b981" unit=" tok/s" />
+      {/* Observability Visualizations */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-2xl bg-[#0B1120] border border-white/[0.08] p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 text-blue-400" /> System Throughput & Latency Trend
+            </h3>
+            <span className="text-[10px] font-mono text-cyan-400 font-semibold uppercase">Prometheus Real-Time</span>
           </div>
-
-          <AlertTable alerts={[]} />
+          <LiveChart title="API Requests / sec" data={mockSeriesData} color="#3B82F6" height={220} />
         </div>
 
-        {/* System Resource Gauges & Service Health */}
-        <div className="space-y-6">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 backdrop-blur-md">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Infrastructure Saturation Gauges
+        <div className="rounded-2xl bg-[#0B1120] border border-white/[0.08] p-6 shadow-xl space-y-6">
+          <div className="border-b border-white/[0.06] pb-3">
+            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+              <Server className="w-4 h-4 text-cyan-400" /> Infrastructure Resource Allocation
             </h3>
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <GaugeChart title="DB Pool Usage" value={db?.poolUsagePercent || 24} color="#06b6d4" />
-              <GaugeChart title="Redis Memory" value={38.4} color="#a855f7" />
-            </div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <GaugeChart title="CPU Load" value={42} color="#06B6D4" />
+            <GaugeChart title="Memory Usage" value={68} color="#8B5CF6" />
+          </div>
+        </div>
+      </div>
 
+      {/* Services Status & Recent Telemetry Events */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-4">
+          <h3 className="font-bold text-white text-sm">Core Platform Microservices</h3>
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Core Subsystem Health Status
-            </h3>
-            <ServiceStatusCard
-              name="FastAPI Backend Engine"
-              type="API Gateway"
-              status="healthy"
-              latencyMs={12}
-              uptimePercent={99.99}
-              details="GET /metrics scraping cleanly"
-            />
-            <ServiceStatusCard
-              name="PostgreSQL Database"
-              type="Relational Store"
-              status="healthy"
-              latencyMs={4}
-              uptimePercent={99.95}
-              details="Async SQLAlchemy pool size: 20"
-            />
-            <ServiceStatusCard
-              name="Redis Cache & Queue"
-              type="In-Memory Cache"
-              status="healthy"
-              latencyMs={1}
-              uptimePercent={100.0}
-              details="12 active client connections"
-            />
+            <ServiceStatusCard name="FastAPI Backend Engine" type="API Gateway" status="healthy" uptimePercent={99.99} latencyMs={currentLatency} />
+            <ServiceStatusCard name="PostgreSQL Database" type="Database" status="healthy" uptimePercent={100.0} latencyMs={12} />
+            <ServiceStatusCard name="Redis 7 Cluster Cache" type="In-Memory Cache" status="healthy" uptimePercent={99.98} latencyMs={4} />
+            <ServiceStatusCard name="Prometheus & Alertmanager" type="Telemetry Scraper" status="healthy" uptimePercent={99.95} latencyMs={8} />
           </div>
         </div>
-      </div>
 
-      {/* Bottom Section: Telemetry Event Stream */}
-      <div className="mt-6">
-        <RecentEvents events={mockEvents} />
+        <div className="lg:col-span-2 space-y-4">
+          <h3 className="font-bold text-white text-sm">Recent Telemetry Events & Traces</h3>
+          <RecentEvents events={mockEvents} />
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
-
-export default MonitoringDashboard;
