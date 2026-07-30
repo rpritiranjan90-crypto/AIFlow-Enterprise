@@ -23,7 +23,7 @@ export interface MetricSummary {
   aiTokensTotal: number;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 export const useSystemHealth = () => {
   return useQuery<SystemHealthData>({
@@ -122,7 +122,7 @@ export const useRedisMetrics = () => {
   });
 };
 
-function extractMetricValue(rawText: string | undefined, metricName: str): number {
+function extractMetricValue(rawText: string | undefined, metricName: string): number {
   if (!rawText) return 0;
   const lines = rawText.split('\n');
   for (const line of lines) {
