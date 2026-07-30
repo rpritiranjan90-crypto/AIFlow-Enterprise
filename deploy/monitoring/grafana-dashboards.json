@@ -1,58 +1,232 @@
-[
-  {
-    "id": null,
-    "uid": "aiflow-health",
-    "title": "AIFlow Platform Health",
-    "tags": [ "aiflow", "health", "api" ],
-    "timezone": "browser",
-    "schemaVersion": 16,
-    "version": 0,
-    "refresh": "5s",
-    "panels": [
+{
+  "annotations": {
+    "list": [
       {
-        "type": "stat",
-        "title": "Global Error Rate",
-        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
-        "targets": [
-          {
-            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
-            "legendFormat": "Error Rate"
-          }
-        ]
-      },
-      {
-        "type": "graph",
-        "title": "API Latency (95th Percentile)",
-        "gridPos": { "h": 8, "w": 16, "x": 8, "y": 0 },
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-            "legendFormat": "P95 Latency"
-          }
-        ]
-      },
-      {
-        "type": "graph",
-        "title": "Active AI Workflows",
-        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-        "targets": [
-          {
-            "expr": "sum(aiflow_active_workflows)",
-            "legendFormat": "Active Workflows"
-          }
-        ]
-      },
-      {
-        "type": "graph",
-        "title": "AI Inference Latency",
-        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(aiflow_inference_duration_seconds_bucket[5m])) by (le, model))",
-            "legendFormat": "{{model}} Latency"
-          }
-        ]
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
       }
     ]
-  }
-]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "1. Executive Overview",
+      "type": "row"
+    },
+    {
+      "title": "Total Requests (24h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "targets": [{ "expr": "sum(increase(aiflow_http_requests_total[24h]))", "legendFormat": "Requests" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "Active Users",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "targets": [{ "expr": "sum(aiflow_active_users)", "legendFormat": "Users" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "Revenue (Estimated MRR)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "targets": [{ "expr": "sum(aiflow_active_users) * 49.99", "legendFormat": "USD" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "AI Cost Today",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "targets": [{ "expr": "sum(increase(aiflow_ai_cost_total[24h]))", "legendFormat": "USD" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "title": "Success Rate %",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "targets": [{ "expr": "(sum(rate(aiflow_http_requests_total{status=~\"2..\"}[5m])) / sum(rate(aiflow_http_requests_total[5m]))) * 100", "legendFormat": "Success Rate" }]
+    },
+    {
+      "title": "Average Latency (ms)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "targets": [{ "expr": "sum(rate(aiflow_http_request_duration_seconds_sum[5m])) / sum(rate(aiflow_http_request_duration_seconds_count[5m])) * 1000", "legendFormat": "Latency" }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 200,
+      "title": "2. API Performance & Exception Dashboard",
+      "type": "row"
+    },
+    {
+      "title": "HTTP Request Rate (req/sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 7,
+      "targets": [{ "expr": "sum(rate(aiflow_http_requests_total[1m])) by (method, handler)", "legendFormat": "{{method}} {{handler}}" }]
+    },
+    {
+      "title": "HTTP Latency Quantiles (P50, P95, P99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 8,
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(aiflow_http_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(aiflow_http_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "P95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(aiflow_http_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "P99" }
+      ]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 300,
+      "title": "3. Database (PostgreSQL / SQLAlchemy) Dashboard",
+      "type": "row"
+    },
+    {
+      "title": "Database Queries / Sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
+      "id": 9,
+      "targets": [{ "expr": "sum(rate(aiflow_db_queries_total[1m])) by (operation)", "legendFormat": "{{operation}}" }]
+    },
+    {
+      "title": "Slow SQL Queries (>500ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
+      "id": 10,
+      "targets": [{ "expr": "sum(rate(aiflow_db_slow_queries_total[5m]))", "legendFormat": "Slow Queries/sec" }]
+    },
+    {
+      "title": "SQL Connection Pool Usage",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 15 },
+      "id": 11,
+      "targets": [{ "expr": "aiflow_db_pool_checked_out_connections / aiflow_db_pool_size * 100", "legendFormat": "Pool Usage %" }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "id": 400,
+      "title": "4. Redis Caching & In-Memory Storage Dashboard",
+      "type": "row"
+    },
+    {
+      "title": "Redis Active Connections",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "id": 12,
+      "targets": [{ "expr": "aiflow_redis_connections", "legendFormat": "Connections" }]
+    },
+    {
+      "title": "Redis Cache Hit Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "id": 13,
+      "targets": [{ "expr": "(sum(rate(aiflow_redis_hits_total[5m])) / (sum(rate(aiflow_redis_hits_total[5m])) + sum(rate(aiflow_redis_misses_total[5m])))) * 100", "legendFormat": "Hit Ratio %" }]
+    },
+    {
+      "title": "Redis Command Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "id": 14,
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(aiflow_redis_latency_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "P95 Latency" }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 500,
+      "title": "5. AI & LLM Inference Dashboard",
+      "type": "row"
+    },
+    {
+      "title": "AI Requests Total",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 33 },
+      "id": 15,
+      "targets": [{ "expr": "sum(rate(aiflow_ai_requests_total[1m])) by (provider, model)", "legendFormat": "{{provider}} - {{model}}" }]
+    },
+    {
+      "title": "Total Tokens Generated / Sec",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 33 },
+      "id": 16,
+      "targets": [{ "expr": "sum(rate(aiflow_ai_tokens_total[1m])) by (type)", "legendFormat": "{{type}}" }]
+    },
+    {
+      "title": "Cumulative AI Cost ($)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 33 },
+      "id": 17,
+      "targets": [{ "expr": "sum(aiflow_ai_cost_total)", "legendFormat": "USD Cost" }]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "id": 600,
+      "title": "6. Business & Workflow Telemetry Dashboard",
+      "type": "row"
+    },
+    {
+      "title": "User Logins Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 42 },
+      "id": 18,
+      "targets": [{ "expr": "sum(rate(aiflow_login_total[5m])) by (status)", "legendFormat": "{{status}}" }]
+    },
+    {
+      "title": "File Uploads Total",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 42 },
+      "id": 19,
+      "targets": [{ "expr": "sum(rate(aiflow_uploaded_files_total[5m])) by (file_type)", "legendFormat": "{{file_type}}" }]
+    },
+    {
+      "title": "Completed Workflow Analyses",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 42 },
+      "id": 20,
+      "targets": [{ "expr": "sum(rate(aiflow_completed_analysis_total[5m])) by (analysis_type)", "legendFormat": "{{analysis_type}}" }]
+    },
+    {
+      "title": "Generated BI Reports",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 42 },
+      "id": 21,
+      "targets": [{ "expr": "sum(rate(aiflow_generated_reports_total[5m])) by (format)", "legendFormat": "{{format}}" }]
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["aiflow", "enterprise", "telemetry", "observability"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"] },
+  "timezone": "browser",
+  "title": "AIFlow Enterprise Production Observability Stack",
+  "uid": "aiflow-enterprise-main"
+}

@@ -1,47 +1,222 @@
 groups:
-- name: aiflow-alerts
-  rules:
-  - alert: HighErrorRate
-    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
-    for: 2m
-    labels:
-      severity: critical
-    annotations:
-      summary: High HTTP error rate
-      description: "More than 5% of requests are returning 5xx errors over the last 5 minutes."
+  - name: aiflow_api_alerts
+    rules:
+      - alert: APIHigh5xxErrorRate
+        expr: (sum(rate(aiflow_http_requests_total{status=~"5.."}[5m])) / sum(rate(aiflow_http_requests_total[5m]))) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API 5xx error rate exceeds 5%"
+          description: "High 5xx server error rate observed: {{ $value | printf \"%.2f\" }}% over the last 5 minutes."
+          runbook_url: "https://docs.aiflow.com/runbooks/api-5xx-errors"
 
-  - alert: HighLatency
-    expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: High API Latency
-      description: "95th percentile latency is greater than 500ms."
+      - alert: APIHigh4xxErrorRate
+        expr: (sum(rate(aiflow_http_requests_total{status=~"4.."}[5m])) / sum(rate(aiflow_http_requests_total[5m]))) * 100 > 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 4xx error rate exceeds 15%"
+          description: "Elevated 4xx client error rate: {{ $value | printf \"%.2f\" }}% over the last 5 minutes."
+          runbook_url: "https://docs.aiflow.com/runbooks/api-4xx-errors"
 
-  - alert: DatabaseDown
-    expr: pg_up == 0
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: PostgreSQL Database is down
-      description: "PostgreSQL exporter is reporting the database is inaccessible."
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, sum(rate(aiflow_http_request_duration_seconds_bucket[5m])) by (le)) > 1.5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 95th percentile latency exceeds 1.5s"
+          description: "P95 request latency is currently {{ $value | printf \"%.2f\" }} seconds."
+          runbook_url: "https://docs.aiflow.com/runbooks/api-high-latency"
 
-  - alert: RedisDown
-    expr: redis_up == 0
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: Redis is down
-      description: "Redis exporter is reporting the cache/broker is inaccessible."
+      - alert: APIHighExceptionRate
+        expr: sum(rate(aiflow_http_exceptions_total[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High uncaught exception rate detected"
+          description: "Uncaught HTTP exception rate is {{ $value | printf \"%.2f\" }} exceptions/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/api-uncaught-exceptions"
 
-  - alert: PodCrashLooping
-    expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
-    for: 10m
-    labels:
-      severity: warning
-    annotations:
-      summary: Pod is crash looping
-      description: "Pod {{ $labels.pod }} is repeatedly crashing."
+  - name: aiflow_database_alerts
+    rules:
+      - alert: DatabaseSlowQueriesSpike
+        expr: sum(rate(aiflow_db_slow_queries_total[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spike in slow SQL queries (>500ms)"
+          description: "Database is experiencing {{ $value | printf \"%.2f\" }} slow queries/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/db-slow-queries"
+
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: aiflow_db_pool_checked_out_connections / aiflow_db_pool_size > 0.85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SQLAlchemy connection pool saturation >85%"
+          description: "Database connection pool utilization is currently {{ $value | printf \"%.2f\" }}%."
+          runbook_url: "https://docs.aiflow.com/runbooks/db-pool-exhaustion"
+
+      - alert: DatabaseQueryFailures
+        expr: sum(rate(aiflow_db_failed_queries_total[5m])) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database query execution failures detected"
+          description: "SQL execution failure rate is {{ $value | printf \"%.2f\" }} failures/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/db-query-failures"
+
+  - name: aiflow_redis_alerts
+    rules:
+      - alert: RedisConnectionExhaustion
+        expr: aiflow_redis_connections > 500
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High active Redis connections"
+          description: "Active Redis connections reached {{ $value }}."
+          runbook_url: "https://docs.aiflow.com/runbooks/redis-connections"
+
+      - alert: RedisHighLatency
+        expr: histogram_quantile(0.95, sum(rate(aiflow_redis_latency_seconds_bucket[5m])) by (le)) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis operation P95 latency exceeds 100ms"
+          description: "P95 Redis command duration is {{ $value | printf \"%.3f\" }} seconds."
+          runbook_url: "https://docs.aiflow.com/runbooks/redis-high-latency"
+
+      - alert: RedisCacheHitRatioDegradation
+        expr: (sum(rate(aiflow_redis_hits_total[5m])) / (sum(rate(aiflow_redis_hits_total[5m])) + sum(rate(aiflow_redis_misses_total[5m])))) < 0.6
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Redis cache hit ratio dropped below 60%"
+          description: "Cache hit ratio is currently {{ $value | printf \"%.2f\" }}%."
+          runbook_url: "https://docs.aiflow.com/runbooks/redis-hit-ratio"
+
+  - name: aiflow_ai_alerts
+    rules:
+      - alert: AICostAnomalySpike
+        expr: sum(increase(aiflow_ai_cost_total[1h])) > 100
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI cost spike exceeds $100/hr"
+          description: "AI LLM inference cost increased by ${{ $value | printf \"%.2f\" }} in the past hour."
+          runbook_url: "https://docs.aiflow.com/runbooks/ai-cost-spike"
+
+      - alert: AITokenUsageSpike
+        expr: sum(rate(aiflow_ai_tokens_total[5m])) > 10000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High AI token consumption rate"
+          description: "LLM token generation rate is {{ $value | printf \"%.0f\" }} tokens/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/ai-token-spike"
+
+      - alert: AIProviderFailures
+        expr: sum(rate(aiflow_ai_failures_total[5m])) > 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI LLM provider request failures"
+          description: "LLM provider API failure rate is {{ $value | printf \"%.2f\" }} errors/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/ai-provider-failures"
+
+      - alert: AIInferenceHighLatency
+        expr: histogram_quantile(0.95, sum(rate(aiflow_ai_request_duration_seconds_bucket[5m])) by (le)) > 10.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI model inference P95 latency exceeds 10s"
+          description: "P95 LLM request duration is {{ $value | printf \"%.2f\" }} seconds."
+          runbook_url: "https://docs.aiflow.com/runbooks/ai-high-latency"
+
+  - name: aiflow_business_alerts
+    rules:
+      - alert: BusinessHighLoginFailures
+        expr: sum(rate(aiflow_login_total{status="failure"}[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated user login failures (potential brute-force)"
+          description: "Login failure rate is {{ $value | printf \"%.2f\" }} failures/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/login-failures"
+
+      - alert: BusinessUploadFailures
+        expr: sum(rate(aiflow_uploaded_files_total{status="error"}[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "File upload failures detected"
+          description: "File processing failure rate is {{ $value | printf \"%.2f\" }} failures/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/upload-failures"
+
+      - alert: BusinessReportGenerationFailures
+        expr: sum(rate(aiflow_generated_reports_total{status="error"}[5m])) > 1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "BI report generation failing"
+          description: "Report generation failure rate is {{ $value | printf \"%.2f\" }} failures/sec."
+          runbook_url: "https://docs.aiflow.com/runbooks/report-failures"
+
+  - name: aiflow_infrastructure_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: (sum(rate(container_cpu_usage_seconds_total{container="aiflow-backend"}[5m])) / sum(kube_pod_container_resource_limits{container="aiflow-backend",resource="cpu"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container CPU utilization >85%"
+          description: "CPU usage for container {{ $labels.container }} is {{ $value | printf \"%.2f\" }}%."
+          runbook_url: "https://docs.aiflow.com/runbooks/high-cpu"
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_working_set_bytes{container="aiflow-backend"} / container_spec_memory_limit_bytes{container="aiflow-backend"}) * 100 > 90
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container memory utilization >90%"
+          description: "Memory usage for container {{ $labels.container }} is {{ $value | printf \"%.2f\" }}%."
+          runbook_url: "https://docs.aiflow.com/runbooks/high-memory"
+
+      - alert: PodRestartLoop
+        expr: rate(kube_pod_container_status_restarts_total{container="aiflow-backend"}[15m]) * 60 > 2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend pod crash looping"
+          description: "Pod {{ $labels.pod }} restarted {{ $value | printf \"%.1f\" }} times in 15m."
+          runbook_url: "https://docs.aiflow.com/runbooks/pod-restart-loop"
+
+      - alert: ServiceDown
+        expr: up{job="aiflow-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AIFlow Backend service instance down"
+          description: "Service target {{ $labels.instance }} is unreachable."
+          runbook_url: "https://docs.aiflow.com/runbooks/service-down"
