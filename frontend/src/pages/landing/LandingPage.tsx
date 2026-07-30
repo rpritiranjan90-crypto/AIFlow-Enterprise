@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import {
@@ -23,7 +23,6 @@ import {
   Activity,
   Star,
   PlayCircle,
-  Clock,
   Code2,
   RefreshCw,
   Gauge,
@@ -31,9 +30,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
-// Animated Stat Item component with count-up animation
+// High-performance Animated Stat Item component with count-up ease-out
 const StatCounter: React.FC<{ value: string; label: string; delay: number }> = ({ value, label, delay }) => {
-  const ref = React.useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-50px' });
   const [displayValue, setDisplayValue] = useState('0');
 
@@ -42,7 +41,7 @@ const StatCounter: React.FC<{ value: string; label: string; delay: number }> = (
     let start = 0;
     const target = parseFloat(value.replace(/[^0-9.]/g, '')) || 100;
     const suffix = value.replace(/[0-9.]/g, '');
-    const duration = 1500;
+    const duration = 1600;
     const stepTime = 30;
     const steps = duration / stepTime;
     const increment = target / steps;
@@ -69,8 +68,8 @@ const StatCounter: React.FC<{ value: string; label: string; delay: number }> = (
       ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.5, delay }}
-      className="space-y-1.5 p-4 rounded-2xl bg-[#0B1120]/40 border border-white/[0.04] backdrop-blur-sm"
+      transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+      className="space-y-1.5 p-5 rounded-2xl bg-[#0B1120]/60 border border-white/[0.06] backdrop-blur-md hover:border-blue-500/30 transition-all duration-300 shadow-lg shadow-black/20"
     >
       <div className="text-3xl sm:text-5xl font-black text-white tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent">
         {displayValue}
@@ -85,9 +84,27 @@ export const LandingPage: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Live fluctuating system metrics state
+  // Mouse-responsive ambient lighting position
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Live fluctuating system metrics & living 6-step workflow execution
   const [latency, setLatency] = useState(340);
   const [activeStep, setActiveStep] = useState(1);
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([
+    '[00:12:45] Ingested 14,200 Snowflake transaction records',
+    '[00:12:46] Claude 3.5 Sonnet Agent: Anomaly Risk Score 0.94',
+    '[00:12:47] FAISS Vector Store memory triple updated',
+    '[00:12:48] Security SLA Alert dispatched to Slack & Jira',
+  ]);
+
+  // Handle mouse move for interactive ambient light
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
 
   // Handle scroll detection for glass navbar
   useEffect(() => {
@@ -98,20 +115,42 @@ export const LandingPage: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fluctuating latency simulation
+  // Fluctuating latency simulation (340ms -> 280ms -> 310ms -> 295ms)
   useEffect(() => {
     const interval = setInterval(() => {
       const latencies = [340, 280, 310, 295, 325, 340];
       setLatency(latencies[Math.floor(Math.random() * latencies.length)]);
-    }, 2500);
+    }, 2400);
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-playing workflow execution step loop
+  // Living 6-step workflow execution loop with live console logs
   useEffect(() => {
     const stepInterval = setInterval(() => {
-      setActiveStep((prev) => (prev >= 4 ? 1 : prev + 1));
-    }, 2200);
+      setActiveStep((prev) => {
+        const nextStep = prev >= 6 ? 1 : prev + 1;
+        const now = new Date().toLocaleTimeString();
+
+        if (nextStep === 1) {
+          setConsoleLogs([
+            `[${now}] Ingested 14,200 Snowflake transaction records`,
+            `[${now}] Triggering Claude 3.5 Sonnet reasoning agent...`,
+          ]);
+        } else if (nextStep === 3) {
+          setConsoleLogs((prevLogs) => [
+            ...prevLogs.slice(-3),
+            `[${now}] FAISS Vector Store memory triples synchronized`,
+          ]);
+        } else if (nextStep === 5) {
+          setConsoleLogs((prevLogs) => [
+            ...prevLogs.slice(-3),
+            `[${now}] Security SLA alert dispatched to Slack & Jira`,
+          ]);
+        }
+
+        return nextStep;
+      });
+    }, 2000);
     return () => clearInterval(stepInterval);
   }, []);
 
@@ -225,48 +264,52 @@ export const LandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#050816] text-slate-100 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
-      {/* SECTION 1: PREMIUM HERO BACKGROUND */}
+    <div
+      onMouseMove={handleMouseMove}
+      className="min-h-screen bg-[#050816] text-slate-100 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative"
+    >
+      {/* SECTION 1 & 2: CINEMATIC BACKGROUND WITH MOUSE-RESPONSIVE AMBIENT LIGHTING */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Interactive Mouse Ambient Light */}
+        <div
+          className="absolute inset-0 transition-opacity duration-300 opacity-60"
+          style={{
+            background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(59, 130, 246, 0.08), transparent 80%)`,
+          }}
+        />
+
         {/* Soft animated aurora gradient orbs */}
         <motion.div
           animate={{
             scale: [1, 1.15, 1],
-            opacity: [0.3, 0.45, 0.3],
+            opacity: [0.35, 0.5, 0.35],
           }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
           className="absolute -top-[150px] left-1/2 -translate-x-1/2 w-[1100px] h-[600px] bg-gradient-to-b from-blue-600/20 via-cyan-500/10 to-transparent blur-[120px] rounded-full"
         />
         <motion.div
           animate={{
-            x: [0, 50, 0],
-            y: [0, 30, 0],
+            x: [0, 40, 0],
+            y: [0, 25, 0],
           }}
-          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
           className="absolute top-[35%] -left-[150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px]"
         />
-        <motion.div
-          animate={{
-            x: [0, -40, 0],
-            y: [0, -30, 0],
-          }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[65%] -right-[150px] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[140px]"
-        />
 
-        {/* Subtle grid pattern */}
+        {/* Subtle grid pattern overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
 
       {/* Navigation Bar (Glassmorphism on Scroll) */}
       <nav
+        aria-label="Main Navigation"
         className={`fixed top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-6 lg:px-16 transition-all duration-300 ${
           isScrolled
             ? 'bg-[#050816]/90 backdrop-blur-2xl border-b border-white/[0.08] shadow-2xl shadow-black/50'
             : 'bg-transparent border-b border-white/[0.04]'
         }`}
       >
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to="/" className="flex items-center gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-purple-600 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-300">
             <Zap className="w-5 h-5 text-white" />
           </div>
@@ -317,7 +360,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </nav>
 
-      {/* HERO SECTION */}
+      {/* SECTION 1: PREMIUM HERO */}
       <section className="relative pt-36 pb-20 px-6 lg:px-12 max-w-7xl mx-auto text-center space-y-8 z-10">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
@@ -332,7 +375,7 @@ export const LandingPage: React.FC = () => {
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.08]"
         >
           Build Intelligent Enterprise Workflows with{' '}
@@ -344,7 +387,7 @@ export const LandingPage: React.FC = () => {
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto font-normal leading-relaxed"
         >
           Transform complex business operations into self-healing, multi-agent AI streams. Connect your enterprise data warehouses, LLM models, and cloud infrastructure with zero security compromises.
@@ -360,7 +403,7 @@ export const LandingPage: React.FC = () => {
             <Button
               variant="glow"
               size="lg"
-              className="h-13 px-8 text-base shadow-xl shadow-blue-600/25 group hover:-translate-y-0.5 transition-transform"
+              className="h-13 px-8 text-base shadow-xl shadow-blue-600/25 group hover:-translate-y-0.5 transition-all duration-300"
               rightIcon={<ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />}
             >
               Start Free Trial
@@ -370,7 +413,7 @@ export const LandingPage: React.FC = () => {
             <Button
               variant="outline"
               size="lg"
-              className="h-13 px-8 text-base border-white/[0.12] bg-[#0B1120]/60 hover:bg-[#111827] hover:-translate-y-0.5 transition-transform"
+              className="h-13 px-8 text-base border-white/[0.12] bg-[#0B1120]/60 hover:bg-[#111827] hover:-translate-y-0.5 transition-all duration-300"
               leftIcon={<PlayCircle className="w-5 h-5 text-cyan-400" />}
             >
               Book Live Demo
@@ -378,7 +421,7 @@ export const LandingPage: React.FC = () => {
           </Link>
         </motion.div>
 
-        {/* SECTION 2 & 3: ANIMATED WORKFLOW PREVIEW & LIVE FLUCTUATING SYSTEM INDICATORS */}
+        {/* SECTION 3 & 4: LIVING WORKFLOW DEMO & LIVE SYSTEM INDICATORS */}
         <motion.div
           id="workflow"
           initial={{ opacity: 0, y: 40 }}
@@ -399,8 +442,8 @@ export const LandingPage: React.FC = () => {
                 <span>aiflow.enterprise.io/orchestrator</span>
               </div>
 
-              {/* SECTION 3: LIVE SYSTEM INDICATORS */}
-              <div className="flex items-center gap-3">
+              {/* LIVE SYSTEM FLUCTUATING METRICS */}
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[11px]">
                   <Activity className="w-3.5 h-3.5 text-blue-400" />
                   <span>Latency:</span>
@@ -434,7 +477,7 @@ export const LandingPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* SECTION 2: ANIMATED WORKFLOW EXECUTION PIPELINE */}
+              {/* LIVING 6-STEP WORKFLOW EXECUTION PIPELINE */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs relative">
                 {/* Step 1: Webhook */}
                 <div
@@ -495,7 +538,7 @@ export const LandingPage: React.FC = () => {
                   <p className="text-[11px] text-slate-400">Triples Graph Updated</p>
                 </div>
 
-                {/* Step 4: Action */}
+                {/* Step 4: Action & Dispatch */}
                 <div
                   className={`p-4 rounded-xl bg-[#111827] border transition-all duration-500 space-y-2 ${
                     activeStep >= 4 ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-white/[0.08]'
@@ -503,7 +546,7 @@ export const LandingPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-emerald-400 font-semibold">STEP 4 • ACTION</span>
-                    {activeStep === 4 && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                    {activeStep >= 4 && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                   </div>
                   <div className="flex items-center gap-2 text-slate-200 font-semibold">
                     <MessageSquare className="w-4 h-4 text-emerald-400" />
@@ -512,12 +555,22 @@ export const LandingPage: React.FC = () => {
                   <p className="text-[11px] text-slate-400">Security Lead Notified</p>
                 </div>
               </div>
+
+              {/* Streaming Execution Console Log Output */}
+              <div className="p-3 rounded-lg bg-[#050816] border border-white/[0.06] font-mono text-[11px] text-slate-400 space-y-1">
+                {consoleLogs.map((log, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-blue-400">&gt;</span>
+                    <span className="text-slate-300">{log}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </motion.div>
       </section>
 
-      {/* SECTION 4: TECHNOLOGY INTEGRATION SECTION */}
+      {/* SECTION 7: TECHNOLOGY INTEGRATIONS */}
       <section id="integrations" className="py-16 border-y border-white/[0.08] bg-[#050816]">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 space-y-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
@@ -541,7 +594,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* SECTION 5: ANIMATED STATISTICS */}
+      {/* SECTION 8: ANIMATED STATISTICS */}
       <section className="py-16 border-b border-white/[0.08] bg-[#0B1120]/40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <StatCounter value="50+" label="Enterprise Integrations" delay={0.1} />
@@ -577,7 +630,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* FEATURE CARDS GRID (MICRO INTERACTIONS) */}
+      {/* SECTION 4 & 9: FEATURE CARDS GRID (MICRO INTERACTIONS & VISUAL DEPTH) */}
       <section id="features" className="py-24 px-6 lg:px-12 max-w-7xl mx-auto space-y-16 border-t border-white/[0.08]">
         <div className="text-center space-y-4">
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
