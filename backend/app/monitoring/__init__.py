@@ -5,6 +5,7 @@ AIFlow Enterprise Monitoring Package.
 from app.monitoring.database_metrics import DatabaseMetrics
 from app.monitoring.metrics import MonitoringMetrics
 from app.monitoring.middleware import MonitoringMiddleware
+from app.monitoring.redis_metrics import RedisMetrics
 from app.monitoring.registry import (
     DuplicateMetricError,
     MetricMetadata,
@@ -19,6 +20,7 @@ __all__ = [
     "MonitoringMetrics",
     "MonitoringMiddleware",
     "DatabaseMetrics",
+    "RedisMetrics",
     "MetricMetadata",
     "MonitoringError",
     "DuplicateMetricError",
