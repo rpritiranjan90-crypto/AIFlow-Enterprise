@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import {
   Zap,
   Bot,
@@ -25,44 +25,124 @@ import {
   PlayCircle,
   Clock,
   Code2,
+  RefreshCw,
+  Gauge,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+
+// Animated Stat Item component with count-up animation
+const StatCounter: React.FC<{ value: string; label: string; delay: number }> = ({ value, label, delay }) => {
+  const ref = React.useRef(null);
+  const isInView = useInView(ref, { once: true, margin: '-50px' });
+  const [displayValue, setDisplayValue] = useState('0');
+
+  useEffect(() => {
+    if (!isInView) return;
+    let start = 0;
+    const target = parseFloat(value.replace(/[^0-9.]/g, '')) || 100;
+    const suffix = value.replace(/[0-9.]/g, '');
+    const duration = 1500;
+    const stepTime = 30;
+    const steps = duration / stepTime;
+    const increment = target / steps;
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= target) {
+        setDisplayValue(value);
+        clearInterval(timer);
+      } else {
+        if (value.includes('.')) {
+          setDisplayValue(start.toFixed(2) + suffix);
+        } else {
+          setDisplayValue(Math.floor(start).toString() + suffix);
+        }
+      }
+    }, stepTime);
+
+    return () => clearInterval(timer);
+  }, [isInView, value]);
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 20 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, delay }}
+      className="space-y-1.5 p-4 rounded-2xl bg-[#0B1120]/40 border border-white/[0.04] backdrop-blur-sm"
+    >
+      <div className="text-3xl sm:text-5xl font-black text-white tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-purple-400 bg-clip-text text-transparent">
+        {displayValue}
+      </div>
+      <div className="text-xs sm:text-sm font-medium text-slate-400">{label}</div>
+    </motion.div>
+  );
+};
 
 export const LandingPage: React.FC = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  // Stats counter values
-  const stats = [
-    { value: '50+', label: 'Enterprise Integrations' },
-    { value: '99.99%', label: 'Platform Availability' },
-    { value: '1M+', label: 'AI Tasks Executed' },
-    { value: '100+', label: 'Workflow Templates' },
+  // Live fluctuating system metrics state
+  const [latency, setLatency] = useState(340);
+  const [activeStep, setActiveStep] = useState(1);
+
+  // Handle scroll detection for glass navbar
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fluctuating latency simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const latencies = [340, 280, 310, 295, 325, 340];
+      setLatency(latencies[Math.floor(Math.random() * latencies.length)]);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-playing workflow execution step loop
+  useEffect(() => {
+    const stepInterval = setInterval(() => {
+      setActiveStep((prev) => (prev >= 4 ? 1 : prev + 1));
+    }, 2200);
+    return () => clearInterval(stepInterval);
+  }, []);
+
+  // Supported enterprise technologies / Logo cloud
+  const techIntegrations = [
+    { name: 'OpenAI', icon: <Bot className="w-5 h-5" />, category: 'LLM Gateway' },
+    { name: 'Anthropic', icon: <Cpu className="w-5 h-5" />, category: 'AI Inference' },
+    { name: 'Google Gemini', icon: <Globe2 className="w-5 h-5" />, category: 'Multimodal' },
+    { name: 'AWS', icon: <Server className="w-5 h-5" />, category: 'Cloud Infra' },
+    { name: 'Microsoft Azure', icon: <Layers className="w-5 h-5" />, category: 'Cloud Infra' },
+    { name: 'Docker', icon: <Blocks className="w-5 h-5" />, category: 'Containers' },
+    { name: 'Kubernetes', icon: <Workflow className="w-5 h-5" />, category: 'Orchestration' },
+    { name: 'PostgreSQL', icon: <Database className="w-5 h-5" />, category: 'pgvector DB' },
+    { name: 'Redis', icon: <RefreshCw className="w-5 h-5" />, category: 'Cache Layer' },
+    { name: 'GitHub', icon: <Code2 className="w-5 h-5" />, category: 'CI/CD Pipelines' },
+    { name: 'OpenTelemetry', icon: <Activity className="w-5 h-5" />, category: 'Tracing' },
+    { name: 'Prometheus', icon: <Gauge className="w-5 h-5" />, category: 'Metrics' },
+    { name: 'Grafana', icon: <BarChart3 className="w-5 h-5 text-amber-400" />, category: 'Dashboards' },
   ];
 
-  // Tech integrations / Logo cloud
-  const techLogos = [
-    { name: 'OpenAI', icon: <Bot className="w-5 h-5" /> },
-    { name: 'Anthropic', icon: <Cpu className="w-5 h-5" /> },
-    { name: 'Google Cloud', icon: <Globe2 className="w-5 h-5" /> },
-    { name: 'AWS', icon: <Server className="w-5 h-5" /> },
-    { name: 'Microsoft Azure', icon: <Layers className="w-5 h-5" /> },
-    { name: 'Docker', icon: <Blocks className="w-5 h-5" /> },
-    { name: 'Kubernetes', icon: <Workflow className="w-5 h-5" /> },
-    { name: 'PostgreSQL', icon: <Database className="w-5 h-5" /> },
-  ];
-
-  // Trust badges
+  // Trust & Security Badges
   const trustBadges = [
     { title: 'Enterprise Ready', desc: 'SLA & VPC Isolation' },
     { title: 'SOC2 Type II Ready', desc: 'End-to-End Encryption' },
-    { title: 'GDPR & CCPA', desc: 'Automated Compliance' },
+    { title: 'GDPR & CCPA', desc: 'Automated Privacy Export' },
     { title: 'Multi-Cloud Native', desc: 'AWS, GCP, Azure, On-Prem' },
     { title: 'Kubernetes Native', desc: 'Helm v1.0 & HPA Scaled' },
     { title: 'OpenTelemetry', desc: 'Full Stack Observability' },
   ];
 
-  // Features list
+  // Feature List
   const features = [
     {
       icon: <Bot className="w-6 h-6 text-blue-400" />,
@@ -146,54 +226,104 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#050816] text-slate-100 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
-      {/* Background Animated Gradient Mesh */}
+      {/* SECTION 1: PREMIUM HERO BACKGROUND */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-blue-600/15 via-cyan-500/10 to-transparent blur-3xl opacity-70" />
-        <div className="absolute top-[40%] -left-[200px] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-3xl" />
-        <div className="absolute top-[70%] -right-[200px] w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+        {/* Soft animated aurora gradient orbs */}
+        <motion.div
+          animate={{
+            scale: [1, 1.15, 1],
+            opacity: [0.3, 0.45, 0.3],
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-[150px] left-1/2 -translate-x-1/2 w-[1100px] h-[600px] bg-gradient-to-b from-blue-600/20 via-cyan-500/10 to-transparent blur-[120px] rounded-full"
+        />
+        <motion.div
+          animate={{
+            x: [0, 50, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[35%] -left-[150px] w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[140px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, -40, 0],
+            y: [0, -30, 0],
+          }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-[65%] -right-[150px] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[140px]"
+        />
+
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       </div>
 
-      {/* Navigation Bar */}
-      <nav className="fixed top-0 inset-x-0 h-20 bg-[#050816]/80 backdrop-blur-xl border-b border-white/[0.08] z-50 flex items-center justify-between px-6 lg:px-16">
+      {/* Navigation Bar (Glassmorphism on Scroll) */}
+      <nav
+        className={`fixed top-0 inset-x-0 h-20 z-50 flex items-center justify-between px-6 lg:px-16 transition-all duration-300 ${
+          isScrolled
+            ? 'bg-[#050816]/90 backdrop-blur-2xl border-b border-white/[0.08] shadow-2xl shadow-black/50'
+            : 'bg-transparent border-b border-white/[0.04]'
+        }`}
+      >
         <Link to="/" className="flex items-center gap-3 group">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-purple-600 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform duration-300">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col">
             <span className="font-extrabold text-slate-100 text-lg tracking-tight flex items-center gap-1.5">
-              AIFlow <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 font-semibold tracking-wider uppercase">Enterprise</span>
+              AIFlow{' '}
+              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 font-semibold tracking-wider uppercase">
+                Enterprise
+              </span>
             </span>
           </div>
         </Link>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <a href="#features" className="hover:text-blue-400 transition-colors">Features</a>
-          <a href="#workflow" className="hover:text-blue-400 transition-colors">Workflow Engine</a>
-          <a href="#integrations" className="hover:text-blue-400 transition-colors">Integrations</a>
-          <a href="#pricing" className="hover:text-blue-400 transition-colors">Pricing</a>
-          <Link to="/docs" className="hover:text-blue-400 transition-colors">Docs</Link>
+          <a href="#features" className="hover:text-blue-400 transition-colors relative group py-1">
+            Features
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+          </a>
+          <a href="#workflow" className="hover:text-blue-400 transition-colors relative group py-1">
+            Workflow Engine
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+          </a>
+          <a href="#integrations" className="hover:text-blue-400 transition-colors relative group py-1">
+            Integrations
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+          </a>
+          <a href="#pricing" className="hover:text-blue-400 transition-colors relative group py-1">
+            Pricing
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+          </a>
+          <Link to="/docs" className="hover:text-blue-400 transition-colors relative group py-1">
+            Docs
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
+          </Link>
         </div>
 
         <div className="flex items-center gap-4">
           <Link to="/login">
-            <Button variant="ghost" className="text-slate-300 hover:text-white">Sign In</Button>
+            <Button variant="ghost" className="text-slate-300 hover:text-white">
+              Sign In
+            </Button>
           </Link>
           <Link to="/signup">
-            <Button variant="glow" rightIcon={<ArrowRight className="w-4 h-4" />}>
+            <Button variant="glow" rightIcon={<ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}>
               Start Free Trial
             </Button>
           </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* HERO SECTION */}
       <section className="relative pt-36 pb-20 px-6 lg:px-12 max-w-7xl mx-auto text-center space-y-8 z-10">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B1120] border border-white/[0.08] text-xs text-blue-400 font-semibold shadow-xl shadow-blue-500/5 backdrop-blur-md"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B1120] border border-white/[0.08] text-xs text-blue-400 font-semibold shadow-xl shadow-blue-500/5 backdrop-blur-md hover:border-blue-500/30 transition-colors"
         >
           <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
           <span>v4.0 Release: Autonomous AI Operating System & Voice Agents</span>
@@ -202,7 +332,7 @@ export const LandingPage: React.FC = () => {
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
           className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.08]"
         >
           Build Intelligent Enterprise Workflows with{' '}
@@ -214,7 +344,7 @@ export const LandingPage: React.FC = () => {
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
           className="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto font-normal leading-relaxed"
         >
           Transform complex business operations into self-healing, multi-agent AI streams. Connect your enterprise data warehouses, LLM models, and cloud infrastructure with zero security compromises.
@@ -223,23 +353,34 @@ export const LandingPage: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
         >
           <Link to="/signup">
-            <Button variant="glow" size="lg" className="h-13 px-8 text-base shadow-xl shadow-blue-600/25" rightIcon={<ArrowRight className="w-5 h-5" />}>
+            <Button
+              variant="glow"
+              size="lg"
+              className="h-13 px-8 text-base shadow-xl shadow-blue-600/25 group hover:-translate-y-0.5 transition-transform"
+              rightIcon={<ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />}
+            >
               Start Free Trial
             </Button>
           </Link>
           <Link to="/docs">
-            <Button variant="outline" size="lg" className="h-13 px-8 text-base border-white/[0.12] bg-[#0B1120]/60 hover:bg-[#111827]" leftIcon={<PlayCircle className="w-5 h-5 text-cyan-400" />}>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-13 px-8 text-base border-white/[0.12] bg-[#0B1120]/60 hover:bg-[#111827] hover:-translate-y-0.5 transition-transform"
+              leftIcon={<PlayCircle className="w-5 h-5 text-cyan-400" />}
+            >
               Book Live Demo
             </Button>
           </Link>
         </motion.div>
 
-        {/* 3D Animated Hero Showcase Mockup */}
+        {/* SECTION 2 & 3: ANIMATED WORKFLOW PREVIEW & LIVE FLUCTUATING SYSTEM INDICATORS */}
         <motion.div
+          id="workflow"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
@@ -257,9 +398,18 @@ export const LandingPage: React.FC = () => {
                 <Lock className="w-3 h-3 text-emerald-400" />
                 <span>aiflow.enterprise.io/orchestrator</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-emerald-400 font-mono text-[11px] font-medium">SYSTEM LIVE (340ms)</span>
+
+              {/* SECTION 3: LIVE SYSTEM INDICATORS */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[11px]">
+                  <Activity className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Latency:</span>
+                  <span className="text-white font-bold">{latency}ms</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-emerald-400 font-mono text-[11px] font-semibold uppercase">SYSTEM LIVE</span>
+                </div>
               </div>
             </div>
 
@@ -272,54 +422,94 @@ export const LandingPage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-white text-base flex items-center gap-2">
-                      Active Execution Stream: Financial Reconciliation & Fraud Detection
+                      Active Stream: Financial Fraud Detection & SLA Dispatch
                     </h3>
-                    <p className="text-xs text-slate-400">Multi-Agent Swarm • Snowflake + Claude 3.5 Sonnet + Slack SLA Alert</p>
+                    <p className="text-xs text-slate-400">Snowflake &rarr; Claude 3.5 Sonnet &rarr; FAISS RAG &rarr; Slack Alert</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5" /> 100% SLA Healthy
+                    <Check className="w-3.5 h-3.5" /> SLA 100% Guaranteed
                   </span>
                 </div>
               </div>
 
-              {/* Workflow Pipeline Graphic */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-[#111827] border border-white/[0.08] space-y-2 relative group hover:border-blue-500/40 transition-colors">
-                  <span className="text-[10px] font-mono text-blue-400 font-semibold block">STEP 1 • TRIGGER</span>
+              {/* SECTION 2: ANIMATED WORKFLOW EXECUTION PIPELINE */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs relative">
+                {/* Step 1: Webhook */}
+                <div
+                  className={`p-4 rounded-xl bg-[#111827] border transition-all duration-500 space-y-2 ${
+                    activeStep >= 1 ? 'border-blue-500 shadow-lg shadow-blue-500/10' : 'border-white/[0.08]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-blue-400 font-semibold">STEP 1 • TRIGGER</span>
+                    {activeStep >= 1 && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                  </div>
                   <div className="flex items-center gap-2 text-slate-200 font-semibold">
                     <Terminal className="w-4 h-4 text-blue-400" />
                     <span>Snowflake Webhook</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">Raw transaction stream ingested</p>
+                  <p className="text-[11px] text-slate-400">Ingested 14,200 rows</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#111827] border border-cyan-500/50 shadow-lg shadow-cyan-500/10 space-y-2 relative group hover:border-cyan-400 transition-colors">
-                  <span className="text-[10px] font-mono text-cyan-400 font-semibold block">STEP 2 • AI REASON</span>
+                {/* Step 2: AI Reasoning */}
+                <div
+                  className={`p-4 rounded-xl bg-[#111827] border transition-all duration-500 space-y-2 ${
+                    activeStep >= 2 ? 'border-cyan-400 shadow-lg shadow-cyan-500/20' : 'border-white/[0.08]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-cyan-400 font-semibold">STEP 2 • AI REASON</span>
+                    {activeStep === 2 ? (
+                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                    ) : activeStep > 2 ? (
+                      <Check className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : null}
+                  </div>
                   <div className="flex items-center gap-2 text-slate-200 font-semibold">
                     <Cpu className="w-4 h-4 text-cyan-400" />
                     <span>Claude 3.5 Agent</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">Scored risk 0.94 / Fraud anomaly</p>
+                  <p className="text-[11px] text-slate-400">Scored Risk: 0.94 (Anomaly)</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#111827] border border-purple-500/40 space-y-2 relative group hover:border-purple-500/60 transition-colors">
-                  <span className="text-[10px] font-mono text-purple-400 font-semibold block">STEP 3 • MEMORY</span>
+                {/* Step 3: Memory Sync */}
+                <div
+                  className={`p-4 rounded-xl bg-[#111827] border transition-all duration-500 space-y-2 ${
+                    activeStep >= 3 ? 'border-purple-500 shadow-lg shadow-purple-500/10' : 'border-white/[0.08]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-purple-400 font-semibold">STEP 3 • MEMORY</span>
+                    {activeStep === 3 ? (
+                      <RefreshCw className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                    ) : activeStep > 3 ? (
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                    ) : null}
+                  </div>
                   <div className="flex items-center gap-2 text-slate-200 font-semibold">
                     <Database className="w-4 h-4 text-purple-400" />
                     <span>FAISS Vector Sync</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">Triple memory graph updated</p>
+                  <p className="text-[11px] text-slate-400">Triples Graph Updated</p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#111827] border border-emerald-500/40 space-y-2 relative group hover:border-emerald-500/60 transition-colors">
-                  <span className="text-[10px] font-mono text-emerald-400 font-semibold block">STEP 4 • ACTION</span>
+                {/* Step 4: Action */}
+                <div
+                  className={`p-4 rounded-xl bg-[#111827] border transition-all duration-500 space-y-2 ${
+                    activeStep >= 4 ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-white/[0.08]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-emerald-400 font-semibold">STEP 4 • ACTION</span>
+                    {activeStep === 4 && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  </div>
                   <div className="flex items-center gap-2 text-slate-200 font-semibold">
                     <MessageSquare className="w-4 h-4 text-emerald-400" />
                     <span>Slack & Jira Dispatch</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">Security team notified in 14ms</p>
+                  <p className="text-[11px] text-slate-400">Security Lead Notified</p>
                 </div>
               </div>
             </div>
@@ -327,21 +517,41 @@ export const LandingPage: React.FC = () => {
         </motion.div>
       </section>
 
-      {/* Animated Live Stats */}
-      <section className="py-12 border-y border-white/[0.08] bg-[#0B1120]/40 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {stats.map((s, idx) => (
-            <div key={idx} className="space-y-1">
-              <div className="text-3xl sm:text-5xl font-black text-white tracking-tight bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                {s.value}
-              </div>
-              <div className="text-xs sm:text-sm font-medium text-slate-400">{s.label}</div>
-            </div>
-          ))}
+      {/* SECTION 4: TECHNOLOGY INTEGRATION SECTION */}
+      <section id="integrations" className="py-16 border-y border-white/[0.08] bg-[#050816]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 space-y-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Built on Trusted Enterprise Technologies
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 opacity-90">
+            {techIntegrations.map((tech, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ y: -4, scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+                className="p-3.5 rounded-xl bg-[#0B1120] border border-white/[0.06] hover:border-blue-500/40 text-slate-300 hover:text-white flex flex-col items-center justify-center gap-1.5 transition-colors group cursor-default shadow-md"
+              >
+                <div className="text-slate-400 group-hover:text-blue-400 transition-colors">{tech.icon}</div>
+                <span className="text-xs font-bold">{tech.name}</span>
+                <span className="text-[9px] text-slate-400 font-mono">{tech.category}</span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Trust & Compliance Section */}
+      {/* SECTION 5: ANIMATED STATISTICS */}
+      <section className="py-16 border-b border-white/[0.08] bg-[#0B1120]/40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <StatCounter value="50+" label="Enterprise Integrations" delay={0.1} />
+          <StatCounter value="99.99%" label="Platform Availability" delay={0.2} />
+          <StatCounter value="1M+" label="AI Tasks Executed" delay={0.3} />
+          <StatCounter value="100+" label="Workflow Templates" delay={0.4} />
+        </div>
+      </section>
+
+      {/* TRUST & COMPLIANCE BADGES */}
       <section className="py-20 px-6 lg:px-12 max-w-7xl mx-auto space-y-12">
         <div className="text-center space-y-3">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
@@ -354,34 +564,21 @@ export const LandingPage: React.FC = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {trustBadges.map((badge, idx) => (
-            <div key={idx} className="p-4 rounded-xl bg-[#0B1120] border border-white/[0.08] text-center space-y-1 hover:border-blue-500/40 transition-colors">
+            <motion.div
+              key={idx}
+              whileHover={{ y: -3 }}
+              className="p-4 rounded-xl bg-[#0B1120] border border-white/[0.08] text-center space-y-1 hover:border-blue-500/40 transition-all shadow-md"
+            >
               <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto mb-2" />
               <h4 className="text-xs font-bold text-white">{badge.title}</h4>
               <p className="text-[10px] text-slate-400">{badge.desc}</p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
 
-      {/* Monochrome Technology Integration Cloud */}
-      <section id="integrations" className="py-16 border-t border-white/[0.08] bg-[#050816]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 space-y-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Native Enterprise Technology Integrations & Multi-Provider AI Gateway
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 opacity-75 hover:opacity-100 transition-opacity">
-            {techLogos.map((tech, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B1120] border border-white/[0.06] text-slate-300 text-xs font-medium">
-                {tech.icon}
-                <span>{tech.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Cards Grid */}
-      <section id="features" className="py-24 px-6 lg:px-12 max-w-7xl mx-auto space-y-16">
+      {/* FEATURE CARDS GRID (MICRO INTERACTIONS) */}
+      <section id="features" className="py-24 px-6 lg:px-12 max-w-7xl mx-auto space-y-16 border-t border-white/[0.08]">
         <div className="text-center space-y-4">
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
             Comprehensive Enterprise AI Platform Capabilities
@@ -395,12 +592,14 @@ export const LandingPage: React.FC = () => {
           {features.map((f, idx) => (
             <motion.div
               key={idx}
-              whileHover={{ y: -6 }}
+              whileHover={{ y: -6, scale: 1.01 }}
               transition={{ duration: 0.2 }}
-              className="p-6 rounded-2xl bg-[#0B1120] border border-white/[0.08] hover:border-blue-500/40 hover:shadow-xl hover:shadow-blue-500/5 transition-all space-y-4 relative group"
+              className="p-6 rounded-2xl bg-[#0B1120] border border-white/[0.08] hover:border-blue-500/40 hover:shadow-2xl hover:shadow-blue-500/10 transition-all space-y-4 relative group"
             >
               <div className="flex items-center justify-between">
-                <div className="p-3 rounded-xl bg-[#111827] border border-white/[0.06]">{f.icon}</div>
+                <div className="p-3 rounded-xl bg-[#111827] border border-white/[0.06] group-hover:scale-110 transition-transform">
+                  {f.icon}
+                </div>
                 <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {f.tag}
                 </span>
@@ -412,7 +611,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Social Proof & Testimonials */}
+      {/* SOCIAL PROOF & TESTIMONIALS */}
       <section className="py-20 px-6 lg:px-12 max-w-7xl mx-auto space-y-12 border-t border-white/[0.08]">
         <div className="text-center space-y-3">
           <h2 className="text-3xl font-extrabold text-white tracking-tight">Trusted by Leading Engineering Teams</h2>
@@ -421,7 +620,7 @@ export const LandingPage: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {testimonials.map((t, idx) => (
-            <div key={idx} className="p-6 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-4 flex flex-col justify-between">
+            <div key={idx} className="p-6 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-4 flex flex-col justify-between hover:border-white/[0.15] transition-colors">
               <div className="space-y-3">
                 <div className="flex items-center gap-1 text-amber-400">
                   {[...Array(t.rating)].map((_, i) => (
@@ -439,7 +638,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Pricing Preview Section */}
+      {/* PRICING PREVIEW SECTION */}
       <section id="pricing" className="py-24 px-6 lg:px-12 max-w-7xl mx-auto space-y-12 border-t border-white/[0.08]">
         <div className="text-center space-y-4">
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">Predictable Enterprise Pricing</h2>
@@ -451,13 +650,17 @@ export const LandingPage: React.FC = () => {
           <div className="inline-flex items-center p-1 rounded-xl bg-[#0B1120] border border-white/[0.08] text-xs">
             <button
               onClick={() => setBillingCycle('monthly')}
-              className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${billingCycle === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                billingCycle === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
             >
               Monthly Billing
             </button>
             <button
               onClick={() => setBillingCycle('yearly')}
-              className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${billingCycle === 'yearly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`px-4 py-1.5 rounded-lg font-medium transition-colors ${
+                billingCycle === 'yearly' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
             >
               Yearly Billing <span className="text-[10px] text-cyan-300 font-bold ml-1">(Save 20%)</span>
             </button>
@@ -466,7 +669,7 @@ export const LandingPage: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Starter Plan */}
-          <div className="p-8 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-6 flex flex-col justify-between">
+          <div className="p-8 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-6 flex flex-col justify-between hover:border-white/[0.2] transition-colors">
             <div className="space-y-4">
               <h4 className="text-lg font-bold text-white">Starter</h4>
               <div className="text-4xl font-extrabold text-white">
@@ -484,7 +687,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Pro Enterprise (Featured) */}
-          <div className="p-8 rounded-2xl bg-[#0B1120] border-2 border-blue-500 shadow-2xl shadow-blue-500/10 relative space-y-6 flex flex-col justify-between">
+          <div className="p-8 rounded-2xl bg-[#0B1120] border-2 border-blue-500 shadow-2xl shadow-blue-500/10 relative space-y-6 flex flex-col justify-between hover:scale-[1.02] transition-transform">
             <span className="absolute -top-3.5 right-6 px-3 py-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-[10px] uppercase rounded-full tracking-wider">
               Recommended
             </span>
@@ -506,7 +709,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Custom Enterprise */}
-          <div className="p-8 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-6 flex flex-col justify-between">
+          <div className="p-8 rounded-2xl bg-[#0B1120] border border-white/[0.08] space-y-6 flex flex-col justify-between hover:border-white/[0.2] transition-colors">
             <div className="space-y-4">
               <h4 className="text-lg font-bold text-white">Dedicated Custom</h4>
               <div className="text-4xl font-extrabold text-white">Custom</div>
@@ -523,7 +726,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* FAQ Accordion Section */}
+      {/* FAQ ACCORDION SECTION */}
       <section className="py-20 px-6 lg:px-12 max-w-4xl mx-auto space-y-8">
         <h2 className="text-3xl font-extrabold text-center text-white tracking-tight">Frequently Asked Questions</h2>
         <div className="space-y-3">
@@ -542,7 +745,7 @@ export const LandingPage: React.FC = () => {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.25 }}
                   >
                     <p className="px-5 pb-5 text-xs text-slate-400 leading-relaxed border-t border-white/[0.04] pt-3">
                       {faq.a}
@@ -555,31 +758,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Footer Banner */}
-      <section className="py-20 px-6 lg:px-12 max-w-5xl mx-auto text-center space-y-6">
-        <div className="p-10 rounded-3xl bg-gradient-to-tr from-blue-600/20 via-cyan-500/10 to-purple-600/20 border border-blue-500/30 space-y-6 shadow-2xl backdrop-blur-xl">
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Ready to Automate Your Enterprise Operations?
-          </h2>
-          <p className="text-slate-300 text-sm max-w-xl mx-auto">
-            Join hundreds of engineering leaders building high-scale AI workflows on AIFlow Enterprise.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-            <Link to="/signup">
-              <Button variant="glow" size="lg" className="h-12 px-8" rightIcon={<ArrowRight className="w-5 h-5" />}>
-                Start Free Trial
-              </Button>
-            </Link>
-            <Link to="/docs">
-              <Button variant="outline" size="lg" className="h-12 px-8">
-                Read Documentation
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Enterprise Footer */}
+      {/* ENTERPRISE FOOTER */}
       <footer className="border-t border-white/[0.08] bg-[#050816] py-16 px-6 lg:px-16 text-xs text-slate-400 space-y-12">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-8">
           <div className="col-span-2 space-y-4">
