@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
 # Stage 1: Build
-FROM python:3.10-slim AS builder
+FROM python:3.13-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -16,46 +16,44 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies
+# Copy and build wheels
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
-# Stage 2: Runtime
-FROM python:3.10-slim AS runtime
+# Stage 2: Production Runtime
+FROM python:3.13-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Create non-root user
-RUN addgroup --system appgroup && adduser --system --group appuser
+# Create non-root user and group
+RUN addgroup --system --gid 10001 appgroup && \
+    adduser --system --uid 10001 --gid 10001 --no-create-home appuser
 
 WORKDIR /app
 
-# Install runtime dependencies (e.g., pg driver)
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy wheels and install
+# Copy wheels and install dependencies
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
-RUN pip install --no-cache /wheels/*
+RUN pip install --no-cache-dir /wheels/*
 
-# Copy application code
+# Copy application source code
 COPY . .
 
-# Set permissions
+# Set strict permissions for non-root execution
 RUN chown -R appuser:appgroup /app
 
-# Switch to non-root user
 USER appuser
 
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Start FastAPI application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]

@@ -1,0 +1,69 @@
+global:
+  environment: production
+  domain: aiflow.enterprise.io
+
+replicaCount: 3
+
+image:
+  backend:
+    repository: ghcr.io/rpritiranjan90-crypto/aiflow-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: ghcr.io/rpritiranjan90-crypto/aiflow-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+resources:
+  backend:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  frontend:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+  hosts:
+    - host: app.aiflow.enterprise.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+    - host: api.aiflow.enterprise.io
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: backend
+  tls:
+    - secretName: aiflow-tls-secret
+      hosts:
+        - app.aiflow.enterprise.io
+        - api.aiflow.enterprise.io
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    path: /metrics
+  prometheusRule:
+    enabled: true
