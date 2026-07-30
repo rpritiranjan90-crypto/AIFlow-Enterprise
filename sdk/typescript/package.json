@@ -1,0 +1,21 @@
+{
+  "name": "@aiflow/sdk",
+  "version": "4.0.0",
+  "description": "Official TypeScript & Node.js SDK for AIFlow Enterprise Autonomous AI OS & Workflow Engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "aiflow",
+    "ai",
+    "workflows",
+    "multi-agent",
+    "dag",
+    "rag",
+    "sdk"
+  ],
+  "author": "AIFlow Enterprise Team",
+  "license": "MIT"
+}
