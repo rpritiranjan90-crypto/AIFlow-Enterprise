@@ -101,7 +101,8 @@ jobs:
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
+          file: ./frontend/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ghcr.io/${{ env.IMAGE_NAMESPACE }}/aiflow-frontend:${{ github.sha }}
@@ -109,11 +110,9 @@ jobs:
 
   deploy-staging:
     needs: build-and-push
-
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
 
     runs-on: ubuntu-latest
-
     environment: staging
 
     steps:
@@ -126,11 +125,9 @@ jobs:
 
   deploy-production:
     needs: deploy-staging
-
     if: github.ref == 'refs/heads/main'
 
     runs-on: ubuntu-latest
-
     environment:
       name: production
 
