@@ -1,22 +1,9 @@
 {
-  "version": 2,
-  "builds": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/vite"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "https://aiflow-backend.onrender.com/api/$1"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/.*",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -30,10 +17,6 @@
         {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
         },
         {
           "key": "Referrer-Policy",
