@@ -1,32 +1,22 @@
 # Changelog
 
-All notable changes to the AIFlow Enterprise platform will be documented in this file.
+All notable changes to **AIFlow Enterprise** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Semantic Versioning Strategy
-- **MAJOR (`X.0.0`)**: Incompatible API changes, major architectural shifts, or backward-incompatible schema migrations.
-- **MINOR (`0.Y.0`)**: Added functionality (New AI integrations, UI pages) in a backwards-compatible manner.
-- **PATCH (`0.0.Z`)**: Backwards-compatible bug fixes, security patches, and performance optimizations.
-
 ---
 
-## [1.0.0] - 2026-07-29
+## [1.0.0] - 2026-07-30
 
 ### Added
-- **Core Platform Architecture**: Initial release of the microservices architecture using FastAPI, React (Vite), Celery, PostgreSQL, and Redis.
-- **Workflow Engine**: Highly parallelized task execution engine capable of abstract AI agent orchestration.
-- **Authentication & Security**: Multi-tenant RBAC model integrated with strict JWT authentication, CORS, and request rate-limiting middlewares.
-- **Performance Optimizations**: Database indexing, asyncio asyncpg integrations, React virtualized lists, and robust caching models.
-- **Observability Stack**: Integrated OpenTelemetry and Prometheus for RED metrics and distributed tracing across all workloads.
-- **Kubernetes Infrastructure**: Native Kubernetes manifests supporting HPA, zero-downtime rolling deployments, and PVC provisioning.
-- **CI/CD**: GitHub Actions pipeline for automated testing, container builds, and deployment verification.
-- **Comprehensive Documentation**: Complete developer, operator, and administrator handbooks finalized for production launch.
-
-### Security
-- Resolved all OWASP Top 10 vulnerabilities (SQLi, XSS, CSRF, Path Traversal).
-- Configured containers to run strictly as non-root users (`appuser`, `nginx`).
-
-### Upgrade Compatibility Notes
-- This is the baseline `v1.0.0` Production Release. Future database migrations will be handled automatically by Alembic during the backend pod initialization sequence (`Base.metadata.create_all` transitioned to Alembic in future MINOR releases).
+- **Multi-Provider AI Gateway**: Provider abstraction supporting OpenAI, Anthropic Claude, Google Gemini, Azure OpenAI, Ollama (Llama 3.1), and OpenRouter with automatic fallbacks and retries.
+- **Enterprise RAG & Vector Database Engine**: Native integration with Pinecone, Qdrant, Weaviate, Milvus, Chroma, and FAISS. Hybrid vector similarity search with document ingestion for PDF, DOCX, Excel, CSV, Markdown, and HTML.
+- **Multi-Agent Swarm Framework**: 8 specialized AI agents (Planner, Research, Data Analyst, Code Gen, Reviewer, Execution, Memory, Coordinator) with inter-agent message buses and execution graphs.
+- **Model Context Protocol (MCP)**: Dynamic tool discovery and remote MCP server execution.
+- **Visual Workflow Engine**: Asynchronous DAG compilation runtime with WebSockets status broadcasting, conditional branching, loops, and retry policies.
+- **30+ Enterprise Connectors**: Pre-built integration connectors for Google Workspace, Microsoft 365, Slack, GitHub, Jira, Salesforce, HubSpot, Stripe, AWS, Azure, GCP, Kubernetes, Docker, Webhooks, REST, GraphQL, Kafka, and RabbitMQ.
+- **Commercial SaaS & Billing Platform**: 5-tier subscription plans (Free, Starter, Pro, Business, Enterprise) with Stripe, Razorpay, and PayPal gateway integrations, usage-based quota metering, and automated invoices.
+- **DevSecOps Security & Compliance**: Enterprise RBAC (8 roles), structured audit logging with CSV/JSON exports, GDPR/CCPA Right to be Forgotten, and data portability exports.
+- **Production Observability**: Full Prometheus metrics, OpenTelemetry tracing, Alertmanager rules, and 6 Grafana dashboards.
+- **Production Kubernetes & Helm Stack**: Multi-stage Python 3.13 Gunicorn backend container, React 19 Nginx Alpine frontend container, Helm charts, and GitHub Actions CD pipelines.
