@@ -1,15 +1,23 @@
-from contextlib import asynccontextmanager
+"""
+AIFlow Enterprise Core Backend Application Entry Point.
+
+Configures FastAPI application lifespan, CORS, middleware, API routes, database,
+and centralized Prometheus/OpenTelemetry monitoring telemetry system.
+"""
+
 import asyncio
+from contextlib import asynccontextmanager
+import time
 
 from fastapi import FastAPI
-from fastapi.openapi.docs import get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-
+from fastapi.openapi.docs import get_redoc_html
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 from redis import asyncio as aioredis
 
+from app.api.metrics import router as metrics_router
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -17,22 +25,25 @@ from app.logging.logger import logger
 from app.middleware.rate_limit import RateLimiterMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
-
-# Import all SQLAlchemy models
 from app.models import *  # noqa: F401,F403
+from app.monitoring import (
+    AIMetrics,
+    BusinessMetrics,
+    DatabaseMetrics,
+    MonitoringMetrics,
+    MonitoringMiddleware,
+    MonitoringRegistry,
+    RedisMetrics,
+)
 
 # ------------------------------------------------------------------
-# Prometheus
+# Optional Prometheus & OpenTelemetry Integration
 # ------------------------------------------------------------------
 
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
 except ImportError:
     Instrumentator = None
-
-# ------------------------------------------------------------------
-# OpenTelemetry
-# ------------------------------------------------------------------
 
 try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -46,13 +57,60 @@ except ImportError:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Initializing AIFlow Enterprise Backend Engine...")
+    """Manage application lifecycle startup and shutdown events."""
+    start_time = time.perf_counter()
+    logger.info("Initializing AIFlow Enterprise Backend Engine & Telemetry System...")
 
-    # Create database tables
+    # 1. Initialize Monitoring System in strict order
+    try:
+        monitoring_metrics = MonitoringMetrics.initialize(namespace="aiflow")
+        db_metrics = DatabaseMetrics.initialize(slow_query_threshold_seconds=0.5)
+        redis_metrics = RedisMetrics.initialize(default_cache_name="redis")
+        ai_metrics = AIMetrics.initialize(default_provider="openai")
+        business_metrics = BusinessMetrics.initialize()
+
+        # Health Validation of Monitoring Components
+        registry = MonitoringRegistry()
+        collector_reg = registry.registry()
+        metrics_list = registry.list_metrics()
+
+        if not registry or not collector_reg or len(metrics_list) == 0:
+            raise RuntimeError("MonitoringRegistry or CollectorRegistry failed health validation check.")
+
+        init_duration_ms = (time.perf_counter() - start_time) * 1000.0
+        logger.info(
+            "Monitoring telemetry system initialized successfully in %.2f ms (%d metrics registered).",
+            init_duration_ms,
+            len(metrics_list),
+        )
+
+        try:
+            from opentelemetry import trace
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span("monitoring_system_startup") as span:
+                span.set_attribute("monitoring.initialization_duration_ms", init_duration_ms)
+                span.set_attribute("monitoring.metrics_count", len(metrics_list))
+        except Exception:
+            pass
+
+    except Exception as exc:
+        logger.critical("Fatal error during monitoring system initialization: %s", exc, exc_info=True)
+        raise RuntimeError(f"Aborting application startup due to monitoring initialization failure: {exc}") from exc
+
+    # 2. Attach database engine to DatabaseMetrics
+    try:
+        if hasattr(engine, "sync_engine"):
+            db_metrics.register_engine(engine.sync_engine, database_name="postgresql")
+        else:
+            db_metrics.register_engine(engine, database_name="postgresql")
+    except Exception as exc:
+        logger.warning("Could not attach DatabaseMetrics to engine sync_engine: %s", exc)
+
+    # 3. Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Initialize Redis Cache
+    # 4. Initialize Redis Cache
     try:
         redis = aioredis.from_url(
             settings.REDIS_URL,
@@ -67,6 +125,7 @@ async def lifespan(app: FastAPI):
             prefix="aiflow-cache",
         )
 
+        redis_metrics.register_client(redis, cache_name="redis")
         logger.info("Redis cache initialized successfully.")
 
     except Exception as e:
@@ -74,10 +133,32 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("Initiating graceful shutdown...")
+    # ------------------------------------------------------------------
+    # Shutdown Sequence
+    # ------------------------------------------------------------------
+    shutdown_start = time.perf_counter()
+    logger.info("Initiating graceful shutdown of AIFlow Enterprise Telemetry and Engine...")
+
+    try:
+        DatabaseMetrics().shutdown()
+        RedisMetrics().shutdown()
+        AIMetrics().shutdown()
+        BusinessMetrics().shutdown()
+
+        shutdown_duration_ms = (time.perf_counter() - shutdown_start) * 1000.0
+        logger.info("Monitoring telemetry system shut down cleanly in %.2f ms.", shutdown_duration_ms)
+
+        try:
+            from opentelemetry import trace
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span("monitoring_system_shutdown") as span:
+                span.set_attribute("monitoring.shutdown_duration_ms", shutdown_duration_ms)
+        except Exception:
+            pass
+    except Exception as exc:
+        logger.error("Error during monitoring shutdown: %s", exc, exc_info=True)
 
     await asyncio.sleep(2)
-
     await engine.dispose()
 
     logger.info("Database connections closed.")
@@ -99,8 +180,10 @@ app = FastAPI(
 )
 
 # ------------------------------------------------------------------
-# Middleware
+# Middleware Pipeline
 # ------------------------------------------------------------------
+
+app.add_middleware(MonitoringMiddleware)
 
 app.add_middleware(RequestIDMiddleware)
 
@@ -133,10 +216,11 @@ app.add_middleware(
 # Routers
 # ------------------------------------------------------------------
 
+app.include_router(metrics_router)
 app.include_router(api_v1_router)
 
 # ------------------------------------------------------------------
-# Monitoring
+# Monitoring Instrumentation Hooks
 # ------------------------------------------------------------------
 
 if Instrumentator:
