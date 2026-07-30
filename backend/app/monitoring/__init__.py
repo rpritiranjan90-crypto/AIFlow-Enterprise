@@ -3,6 +3,7 @@ AIFlow Enterprise Monitoring Package.
 """
 
 from app.monitoring.ai_metrics import AIMetrics
+from app.monitoring.business_metrics import BusinessMetrics
 from app.monitoring.database_metrics import DatabaseMetrics
 from app.monitoring.metrics import MonitoringMetrics
 from app.monitoring.middleware import MonitoringMiddleware
@@ -23,6 +24,7 @@ __all__ = [
     "DatabaseMetrics",
     "RedisMetrics",
     "AIMetrics",
+    "BusinessMetrics",
     "MetricMetadata",
     "MonitoringError",
     "DuplicateMetricError",
