@@ -49,6 +49,9 @@ COPY . .
 # Set strict permissions for non-root execution
 RUN chown -R appuser:appgroup /app
 
+# Set HOME for non-root user
+ENV HOME=/tmp
+
 USER appuser
 
 EXPOSE 8000
