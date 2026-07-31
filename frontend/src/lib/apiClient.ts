@@ -1,7 +1,15 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-const BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Normalize BASE_URL so it ALWAYS includes /api/v1 prefix regardless of VITE_API_BASE_URL formatting
+let rawBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+if (typeof rawBaseUrl === 'string') {
+  rawBaseUrl = rawBaseUrl.trim().replace(/\/$/, '');
+  if (!rawBaseUrl.endsWith('/api/v1')) {
+    rawBaseUrl = `${rawBaseUrl}/api/v1`;
+  }
+}
+const BASE_URL = rawBaseUrl;
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
