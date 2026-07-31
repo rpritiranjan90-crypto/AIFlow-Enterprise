@@ -1,56 +1,249 @@
-import React, { useState } from 'react';
-import { Database, Upload, Search, FileText, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Database, Upload, Search, FileText, Sparkles, Plus, CheckCircle2, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
-import { Citation } from '../types/ai';
+import { useToast } from '@/components/ui/Toast';
+import { apiClient } from '@/lib/apiClient';
+import { Citation, KnowledgeBaseItem } from '../types/ai';
+
+interface DocumentItem {
+  id: string;
+  knowledge_base_id: string;
+  file_name: string;
+  file_type: string;
+  chunk_count: number;
+  status: string;
+  created_at: string;
+}
 
 export const KnowledgeBasePage: React.FC = () => {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [activeTab, setActiveTab] = useState('kb');
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Upload States
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedKbId, setSelectedKbId] = useState<string>('kb_01');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+
+  // Vector Search States
   const [searchQuery, setSearchQuery] = useState('SOC2 encryption guidelines');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Citation[]>([]);
 
-  const handleVectorSearch = () => {
-    setIsSearching(true);
-    setTimeout(() => {
-      setIsSearching(false);
-      setSearchResults([
-        {
-          documentName: 'SOC2_Compliance_Security_Guardrails.docx',
-          chunkId: 'vec_chunk_204',
-          score: 0.94,
-          text: 'Payloads are encrypted using AES-256 and RBAC permissions enforce workspace isolation for all multi-tenant credentials.',
-        },
-        {
-          documentName: 'AIFlow_Enterprise_Architecture.pdf',
-          chunkId: 'vec_chunk_101',
-          score: 0.88,
-          text: 'AIFlow Enterprise uses DAG compilation via Kahn\'s algorithm for visual workflows and async task worker pools.',
-        },
+  // Create KB Modal State
+  const [showCreateKbModal, setShowCreateKbModal] = useState(false);
+  const [newKbName, setNewKbName] = useState('');
+  const [newKbDescription, setNewKbDescription] = useState('');
+  const [newKbTags, setNewKbTags] = useState('Engineering,Security');
+  const [isCreatingKb, setIsCreatingKb] = useState(false);
+
+  // Load Knowledge Bases and Documents from Backend
+  const fetchKnowledgeData = async () => {
+    setIsLoading(true);
+    try {
+      const [kbRes, docRes] = await Promise.all([
+        apiClient.get('/knowledge-bases'),
+        apiClient.get('/documents'),
       ]);
-    }, 600);
+
+      const formattedKbs: KnowledgeBaseItem[] = kbRes.data.map((kb: any) => ({
+        id: kb.id,
+        name: kb.name,
+        description: kb.description || '',
+        tags: kb.tags || 'General',
+        documentCount: kb.document_count ?? 0,
+        vectorCount: kb.vector_count ?? 0,
+        createdAt: kb.created_at,
+      }));
+
+      setKnowledgeBases(formattedKbs);
+      setDocuments(docRes.data);
+      if (formattedKbs.length > 0 && !selectedKbId) {
+        setSelectedKbId(formattedKbs[0].id);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch knowledge bases:', err);
+      toast('Knowledge Base Error', 'Using local cached knowledge collections.', 'warning');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKnowledgeData();
+  }, []);
+
+  // Trigger File Input Click
+  const handleUploadButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle File Selection and API Upload
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.size > 50 * 1024 * 1024) {
+      toast('File Too Large', 'Maximum allowed document size is 50MB.', 'error');
+      return;
+    }
+
+    setCurrentFile(file);
+    setIsUploading(true);
+    setShowUploadModal(true);
+    setUploadProgress(10);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('knowledge_base_id', selectedKbId || 'kb_01');
+
+    try {
+      const response = await apiClient.post('/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(Math.min(percent, 95));
+          }
+        },
+      });
+
+      setUploadProgress(100);
+      toast(
+        'Document Indexed Successfully!',
+        response.data.message || `Successfully chunked and indexed ${file.name} into vector memory.`,
+        'success'
+      );
+
+      // Refresh Knowledge Base & Documents List
+      await fetchKnowledgeData();
+
+      setTimeout(() => {
+        setIsUploading(false);
+        setShowUploadModal(false);
+        setCurrentFile(null);
+        setUploadProgress(0);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Upload Error:', err);
+      const errMsg = err.response?.data?.detail || 'Failed to upload document to RAG vector pipeline.';
+      toast('Upload Failed', errMsg, 'error');
+      setIsUploading(false);
+      setShowUploadModal(false);
+      setUploadProgress(0);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle Vector Search
+  const handleVectorSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const response = await apiClient.post('/search', {
+        query: searchQuery,
+        knowledge_base_id: selectedKbId,
+        top_k: 4,
+      });
+
+      const citations: Citation[] = response.data.results.map((res: any) => ({
+        documentName: res.document_name,
+        chunkId: res.chunk_id,
+        score: res.score,
+        text: res.text,
+      }));
+
+      setSearchResults(citations);
+      toast('Vector Search Complete', `Found ${citations.length} semantic matches in vector memory.`, 'info');
+    } catch (err: any) {
+      console.error('Vector Search Error:', err);
+      toast('Vector Search Error', 'Failed to perform similarity search.', 'error');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle Create KB Collection
+  const handleCreateKb = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKbName.trim()) return;
+
+    setIsCreatingKb(true);
+    try {
+      await apiClient.post('/knowledge-bases', {
+        name: newKbName,
+        description: newKbDescription,
+        tags: newKbTags,
+      });
+
+      toast('Knowledge Base Created', `Successfully created collection '${newKbName}'.`, 'success');
+      setShowCreateKbModal(false);
+      setNewKbName('');
+      setNewKbDescription('');
+      fetchKnowledgeData();
+    } catch (err: any) {
+      toast('Error Creating Collection', 'Failed to save new knowledge collection.', 'error');
+    } finally {
+      setIsCreatingKb(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+        accept=".pdf,.docx,.doc,.txt,.md,.json,.csv,.py,.ts"
+      />
+
       <PageHeader
         title="Knowledge Bases & Vector Search (RAG)"
         description="Ingest enterprise documents, chunk text, and perform semantic vector similarity retrieval"
         breadcrumbs={[{ label: 'AIFlow' }, { label: 'Knowledge Base' }]}
         actions={
-          <Button variant="glow" leftIcon={<Upload className="w-4 h-4" />}>
-            Upload Document
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={() => setShowCreateKbModal(true)}
+            >
+              New Collection
+            </Button>
+            <Button
+              variant="glow"
+              leftIcon={<Upload className="w-4 h-4" />}
+              isLoading={isUploading}
+              onClick={handleUploadButtonClick}
+            >
+              Upload Document
+            </Button>
+          </div>
         }
       />
 
       <Tabs
         tabs={[
-          { id: 'kb', label: 'Knowledge Collections', icon: <Database className="w-4 h-4" />, count: 2 },
+          { id: 'kb', label: 'Knowledge Collections', icon: <Database className="w-4 h-4" />, count: knowledgeBases.length },
           { id: 'search', label: 'Vector Similarity Explorer', icon: <Search className="w-4 h-4" /> },
         ]}
         activeTab={activeTab}
@@ -58,54 +251,72 @@ export const KnowledgeBasePage: React.FC = () => {
       />
 
       {activeTab === 'kb' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card glow className="space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="text-base font-bold text-slate-100">Enterprise Architecture & Security</h4>
-                <p className="text-xs text-slate-400 mt-1">SOC2 guidelines, VPC topologies, and database schemas</p>
-              </div>
-              <Badge variant="glow">1,420 Vectors</Badge>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-[#0B1120] p-4 rounded-xl border border-white/[0.08]">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400 font-medium">Target Collection:</span>
+              <select
+                value={selectedKbId}
+                onChange={(e) => setSelectedKbId(e.target.value)}
+                className="bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {knowledgeBases.map((kb) => (
+                  <option key={kb.id} value={kb.id}>
+                    {kb.name} ({kb.documentCount} docs)
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-300">
-                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-cyan-400" /> AIFlow_Enterprise_Architecture.pdf</span>
-                <span className="text-[10px] text-emerald-400">42 chunks</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-cyan-400" /> SOC2_Compliance_Security_Guardrails.docx</span>
-                <span className="text-[10px] text-emerald-400">28 chunks</span>
-              </div>
-            </div>
-          </Card>
+            <Button variant="secondary" size="sm" leftIcon={<RefreshCw className="w-3.5 h-3.5" />} onClick={fetchKnowledgeData}>
+              Refresh Collections
+            </Button>
+          </div>
 
-          <Card glow className="space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="text-base font-bold text-slate-100">Sales Playbook & Product Specs</h4>
-                <p className="text-xs text-slate-400 mt-1">Pricing tier breakdown and SLA commitments</p>
-              </div>
-              <Badge variant="info">850 Vectors</Badge>
-            </div>
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-300">
-                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-cyan-400" /> Enterprise_Pricing_Tier_Battlecard.pdf</span>
-                <span className="text-[10px] text-emerald-400">18 chunks</span>
-              </div>
-            </div>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {knowledgeBases.map((kb) => {
+              const kbDocs = documents.filter((doc) => doc.knowledge_base_id === kb.id);
+              return (
+                <Card key={kb.id} glow className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-base font-bold text-slate-100">{kb.name}</h4>
+                      <p className="text-xs text-slate-400 mt-1">{kb.description || 'Enterprise knowledge vector collection.'}</p>
+                    </div>
+                    <Badge variant="glow">{kb.vectorCount.toLocaleString()} Vectors</Badge>
+                  </div>
+
+                  <div className="p-3 bg-[#050816] rounded-xl border border-white/[0.08] space-y-2 text-xs max-h-48 overflow-y-auto">
+                    {kbDocs.length > 0 ? (
+                      kbDocs.map((doc) => (
+                        <div key={doc.id} className="flex justify-between items-center text-slate-300 py-1 border-b border-white/[0.04] last:border-0">
+                          <span className="flex items-center gap-1.5 truncate pr-2">
+                            <FileText className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="truncate">{doc.file_name}</span>
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-mono shrink-0">{doc.chunk_count} chunks</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-[11px] text-slate-500 italic text-center py-2">No documents uploaded yet. Click 'Upload Document' to add.</p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       ) : (
         /* Vector Explorer Tab */
         <Card glow className="space-y-4 max-w-3xl">
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-brand-400" /> Semantic Vector Search Query
+            <Sparkles className="w-4 h-4 text-cyan-400" /> Semantic Vector Search Query
           </h3>
           <div className="flex gap-2">
             <Input
               placeholder="Enter search query to perform cosine similarity search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleVectorSearch()}
             />
             <Button variant="glow" isLoading={isSearching} onClick={handleVectorSearch}>
               Search Memory
@@ -113,19 +324,111 @@ export const KnowledgeBasePage: React.FC = () => {
           </div>
 
           <div className="space-y-3 pt-2">
-            {searchResults.map((res, i) => (
-              <div key={i} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-200">{res.documentName}</span>
-                  <span className="font-mono text-emerald-400 font-bold">Similarity Score: {res.score}</span>
+            {searchResults.length > 0 ? (
+              searchResults.map((res, i) => (
+                <div key={i} className="p-4 rounded-xl bg-[#050816] border border-white/[0.08] space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-blue-400" /> {res.documentName}
+                    </span>
+                    <span className="font-mono text-emerald-400 font-bold">Similarity Score: {res.score}</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed font-sans bg-[#111827] p-2.5 rounded-lg border border-white/[0.04]">
+                    {res.text}
+                  </p>
+                  <span className="text-[10px] text-slate-500 font-mono">Chunk ID: {res.chunkId}</span>
                 </div>
-                <p className="text-slate-300 leading-relaxed font-sans">{res.text}</p>
-                <span className="text-[10px] text-slate-500 font-mono">Chunk ID: {res.chunkId}</span>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-xs text-slate-400 italic text-center py-6">Enter a query above to test RAG vector retrieval matching uploaded document chunks.</p>
+            )}
           </div>
         </Card>
+      )}
+
+      {/* Upload Progress Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0B1120] border border-white/[0.12] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-blue-400 animate-bounce" /> Processing & Ingesting Document
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-300 font-mono">
+                <span className="truncate max-w-[200px]">{currentFile?.name}</span>
+                <span className="text-blue-400 font-bold">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-[#111827] rounded-full h-2 overflow-hidden border border-white/[0.06]">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-cyan-400 h-2 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">Extracting text, computing 1536-dimensional embeddings, and indexing into FAISS vector memory...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Knowledge Collection Modal */}
+      {showCreateKbModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0B1120] border border-white/[0.12] rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <Database className="w-4 h-4 text-blue-400" /> Create Knowledge Collection
+              </h3>
+              <button onClick={() => setShowCreateKbModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateKb} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300 font-medium">Collection Name</label>
+                <Input
+                  placeholder="e.g. Legal Contracts & SLAs"
+                  value={newKbName}
+                  onChange={(e) => setNewKbName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300 font-medium">Description</label>
+                <Input
+                  placeholder="e.g. Master service agreements and compliance terms"
+                  value={newKbDescription}
+                  onChange={(e) => setNewKbDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300 font-medium">Tags (Comma-separated)</label>
+                <Input
+                  placeholder="Legal, SLAs, Procurement"
+                  value={newKbTags}
+                  onChange={(e) => setNewKbTags(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="secondary" size="sm" type="button" onClick={() => setShowCreateKbModal(false)}>
+                  Cancel
+                </Button>
+                <Button variant="glow" size="sm" type="submit" isLoading={isCreatingKb}>
+                  Create Collection
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
 };
+
+export default KnowledgeBasePage;

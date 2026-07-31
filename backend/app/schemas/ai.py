@@ -49,6 +49,24 @@ class KnowledgeBaseResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class DocumentItemResponse(BaseModel):
+    id: str
+    knowledge_base_id: str
+    file_name: str
+    file_type: str
+    chunk_count: int
+    status: str
+    created_at: datetime
+
+class DocumentUploadResponse(BaseModel):
+    id: str
+    file_name: str
+    status: str
+    chunks_created: int
+    knowledge_base_id: str
+    message: str
+    created_at: datetime
+
 class VectorSearchRequest(BaseModel):
     query: str
     knowledge_base_id: Optional[str] = None
