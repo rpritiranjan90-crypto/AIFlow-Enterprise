@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from pgvector.sqlalchemy import Vector
 
 from app.core.database import Base
 
@@ -12,10 +13,10 @@ class PromptTemplate(Base):
     id = Column(String, primary_key=True, default=lambda: f"pmpt_{uuid.uuid4().hex[:12]}")
     workspace_id = Column(String, ForeignKey("workspaces.id"), index=True, nullable=False, default="ws_prod_01")
     name = Column(String, nullable=False)
-    category = Column(String, default="General") # Agent, Summarizer, Classifier, System
+    category = Column(String, default="General")
     system_prompt = Column(Text, nullable=False)
     user_prompt = Column(Text, nullable=True)
-    variables_json = Column(Text, nullable=True) # JSON list of dynamic variables
+    variables_json = Column(Text, nullable=True)
     version = Column(String, default="1.0.0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -37,9 +38,9 @@ class KnowledgeDocument(Base):
     id = Column(String, primary_key=True, default=lambda: f"doc_{uuid.uuid4().hex[:12]}")
     knowledge_base_id = Column(String, ForeignKey("knowledge_bases.id"), nullable=False)
     file_name = Column(String, nullable=False)
-    file_type = Column(String, nullable=False) # PDF, DOCX, TXT, MD, CSV
+    file_type = Column(String, nullable=False)
     file_size = Column(Integer, default=0)
-    status = Column(String, default="indexed", index=True) # uploaded, processing, indexed, failed
+    status = Column(String, default="indexed", index=True)
     chunk_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -49,9 +50,11 @@ class VectorChunk(Base):
     id = Column(String, primary_key=True, default=lambda: f"vec_{uuid.uuid4().hex[:12]}")
     document_id = Column(String, ForeignKey("knowledge_documents.id"), nullable=False)
     knowledge_base_id = Column(String, ForeignKey("knowledge_bases.id"), nullable=False)
+    document_name = Column(String, nullable=True)
     content = Column(Text, nullable=False)
     metadata_json = Column(Text, nullable=True)
-    embedding_vector = Column(Text, nullable=True) # JSON float array string
+    embedding = Column(Vector(1536), nullable=True)
+    embedding_json = Column(Text, nullable=True)
 
 class AgentSession(Base):
     __tablename__ = "agent_sessions"
@@ -68,7 +71,7 @@ class ChatMessage(Base):
 
     id = Column(String, primary_key=True, default=lambda: f"msg_{uuid.uuid4().hex[:12]}")
     session_id = Column(String, ForeignKey("agent_sessions.id"), index=True, nullable=False)
-    role = Column(String, nullable=False) # user, assistant, system, tool
+    role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     citations_json = Column(Text, nullable=True)
     tokens_used = Column(Integer, default=0)

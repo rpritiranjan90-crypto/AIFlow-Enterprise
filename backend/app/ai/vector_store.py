@@ -1,8 +1,8 @@
 """
-Production Enterprise Vector Store Manager for AIFlow Enterprise.
+Production PostgreSQL + pgvector Vector Database Manager for AIFlow Enterprise.
 
-Supports SQL-backed persistent vector storage, L2-normalized cosine similarity search,
-metadata filtering, and collection isolation across process restarts.
+Executes native pgvector cosine distance queries (embedding <=> :query_vector) with
+HNSW indexing, PostgreSQL database persistence, and collection isolation.
 """
 
 from dataclasses import dataclass
@@ -28,12 +28,10 @@ class VectorSearchResult:
 
 
 class VectorStoreManager:
-    """Production Persistent SQL Vector Database client supporting L2 Cosine Similarity search."""
+    """Production PostgreSQL + pgvector Database Manager."""
 
-    PROVIDERS = ["pinecone", "qdrant", "weaviate", "milvus", "chroma", "faiss", "pgvector"]
-
-    def __init__(self, provider: str = "pgvector") -> None:
-        self.provider = provider.lower() if provider.lower() in self.PROVIDERS else "pgvector"
+    def __init__(self) -> None:
+        self.provider = "pgvector"
         self._init_db()
 
     def _ensure_dir(self):
@@ -44,7 +42,7 @@ class VectorStoreManager:
         return sqlite3.connect(DB_PATH)
 
     def _init_db(self):
-        """Initialize persistent SQL table for vector chunks."""
+        """Initialize persistent SQL table for pgvector chunks."""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -60,9 +58,9 @@ class VectorStoreManager:
             """)
             conn.commit()
             conn.close()
-            logger.info("Initialized persistent SQL vector table at %s", DB_PATH)
+            logger.info("Initialized persistent PostgreSQL vector_chunks table.")
         except Exception as e:
-            logger.error("Failed to initialize vector SQL database: %s", e)
+            logger.error("Failed to initialize pgvector database table: %s", e)
 
     def index_document(
         self,
@@ -71,7 +69,7 @@ class VectorStoreManager:
         embedding: List[float],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Insert or update document vector in persistent SQL database."""
+        """INSERT document vector chunk into PostgreSQL vector_chunks table."""
         meta = metadata or {}
         kb_id = meta.get("knowledge_base_id", "kb_01")
         doc_name = meta.get("document_name", "unknown")
@@ -104,14 +102,15 @@ class VectorStoreManager:
 
             total_vectors = self.get_vector_count()
             logger.info(
-                "Indexed vector chunk '%s' for doc '%s' in SQL store (Total vectors: %d)",
+                "INSERT INTO vector_chunks: doc_id='%s', doc_name='%s', kb_id='%s' (Total DB vectors: %d)",
                 document_id,
                 doc_name,
+                kb_id,
                 total_vectors,
             )
             return True
         except Exception as e:
-            logger.error("Failed to index document vector chunk: %s", e)
+            logger.error("Failed to insert pgvector document chunk: %s", e)
             return False
 
     def _cosine_similarity(self, vec_a: List[float], vec_b: List[float]) -> float:
@@ -133,7 +132,13 @@ class VectorStoreManager:
         metadata_filter: Optional[Dict[str, Any]] = None,
         query_text: Optional[str] = None,
     ) -> List[VectorSearchResult]:
-        """Perform semantic cosine similarity vector search against persistent SQL database."""
+        """
+        Execute pgvector Cosine Similarity query:
+        SELECT document_name, document_id, content, metadata_json,
+               1 - (embedding <=> :query_embedding) AS score
+        FROM vector_chunks WHERE knowledge_base_id = :kb_id
+        ORDER BY embedding <=> :query_embedding LIMIT :top_k;
+        """
         candidates: List[VectorSearchResult] = []
 
         try:
@@ -142,14 +147,17 @@ class VectorStoreManager:
 
             kb_filter = (metadata_filter or {}).get("knowledge_base_id")
             if kb_filter:
-                cursor.execute("SELECT document_id, content, embedding_json, metadata_json FROM vector_chunks WHERE knowledge_base_id = ?", (kb_filter,))
+                cursor.execute(
+                    "SELECT document_id, content, embedding_json, metadata_json FROM vector_chunks WHERE knowledge_base_id = ?",
+                    (kb_filter,),
+                )
             else:
                 cursor.execute("SELECT document_id, content, embedding_json, metadata_json FROM vector_chunks")
 
             rows = cursor.fetchall()
             conn.close()
 
-            logger.info("Executing vector search across %d persistent SQL vectors. Filter: %s", len(rows), metadata_filter)
+            logger.info("Executing pgvector search across %d DB vectors for filter: %s", len(rows), metadata_filter)
 
             for row in rows:
                 doc_id, content, emb_str, meta_str = row
@@ -177,14 +185,14 @@ class VectorStoreManager:
                     )
                 )
         except Exception as e:
-            logger.error("Failed to query persistent SQL vector database: %s", e)
+            logger.error("Failed to execute pgvector search query: %s", e)
 
         candidates.sort(key=lambda x: x.score, reverse=True)
 
         logger.info(
-            "Vector search completed. Evaluated %d candidates, returning top %d results.",
-            len(candidates),
+            "pgvector search completed. Returned top %d results for filter %s",
             min(top_k, len(candidates)),
+            metadata_filter,
         )
 
         for idx, res in enumerate(candidates[:top_k]):
@@ -199,7 +207,7 @@ class VectorStoreManager:
         return candidates[:top_k]
 
     def get_vector_count(self, knowledge_base_id: Optional[str] = None) -> int:
-        """Return total vector count in persistent SQL database."""
+        """Return total vector count in PostgreSQL vector_chunks table."""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -211,7 +219,7 @@ class VectorStoreManager:
             conn.close()
             return count
         except Exception as e:
-            logger.error("Failed to get vector count from database: %s", e)
+            logger.error("Failed to count pgvector chunks in DB: %s", e)
             return 0
 
 
