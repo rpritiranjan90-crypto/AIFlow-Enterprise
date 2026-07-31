@@ -211,11 +211,10 @@ async def upload_document(
 
 @router.post("/search", response_model=VectorSearchResponse)
 async def search_vector_memory(body: VectorSearchRequest):
+    from app.core.database import engine
     logger.info(
-        "Vector search request received: query='%s', kb_id='%s', top_k=%d",
-        body.query,
-        body.knowledge_base_id,
-        body.top_k,
+        "[SEARCH][1] Request: query='%s', knowledge_base_id='%s', top_k=%d, dialect=%s",
+        body.query, body.knowledge_base_id, body.top_k, engine.dialect.name,
     )
 
     citations = await rag_engine.search_vector_memory(
@@ -236,7 +235,7 @@ async def search_vector_memory(body: VectorSearchRequest):
         )
 
     logger.info(
-        "Vector search completed: returned %d results for query '%s'. Top match: doc='%s', score=%.4f",
+        "[SEARCH][2] Result: %d citations returned for query='%s'. Top match: doc='%s', score=%.4f",
         len(formatted_citations),
         body.query,
         formatted_citations[0].document_name if formatted_citations else "None",
@@ -244,3 +243,4 @@ async def search_vector_memory(body: VectorSearchRequest):
     )
 
     return VectorSearchResponse(query=body.query, results=formatted_citations)
+
