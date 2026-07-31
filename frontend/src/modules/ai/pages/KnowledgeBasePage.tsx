@@ -176,37 +176,12 @@ export const KnowledgeBasePage: React.FC = () => {
 
       await fetchKnowledgeData();
     } catch (err: any) {
-      console.warn('Backend API upload fallback triggered:', err);
-      // Resilience fallback: guarantee zero-fail local vector indexing
-      setUploadProgress(100);
-      const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() || 'txt' : 'txt';
-      const newDocId = `doc_${Math.random().toString(36).substring(2, 10)}`;
-      const newChunks = 36;
-      const targetKb = selectedKbId || 'kb_01';
-
-      const newDoc: DocumentItem = {
-        id: newDocId,
-        knowledge_base_id: targetKb,
-        file_name: file.name,
-        file_type: ext,
-        chunk_count: newChunks,
-        status: 'indexed',
-        created_at: new Date().toISOString(),
-      };
-
-      setDocuments((prev) => [newDoc, ...prev]);
-      setKnowledgeBases((prev) =>
-        prev.map((kb) =>
-          kb.id === targetKb
-            ? { ...kb, documentCount: kb.documentCount + 1, vectorCount: kb.vectorCount + newChunks }
-            : kb
-        )
-      );
-
+      const errMsg = err?.response?.data?.detail || err?.message || 'Unknown error';
+      console.error('[Upload] Failed to upload document to backend:', errMsg, err);
       toast(
-        'Document Indexed Successfully!',
-        `Successfully chunked and indexed '${file.name}' into vector memory (${newChunks} chunks created).`,
-        'success'
+        'Upload Failed',
+        `Could not index '${file.name}': ${errMsg}`,
+        'error'
       );
     } finally {
       setTimeout(() => {
@@ -242,23 +217,10 @@ export const KnowledgeBasePage: React.FC = () => {
       setSearchResults(citations);
       toast('Vector Search Complete', `Found ${citations.length} semantic matches in vector memory.`, 'info');
     } catch (err: any) {
-      // Fallback search results
-      const fallbackCitations: Citation[] = [
-        {
-          documentName: 'AIFlow_Enterprise_Architecture.pdf',
-          chunkId: 'chunk_881',
-          score: 0.96,
-          text: `Exact vector match for "${searchQuery}": Enterprise RAG architecture enforces SOC2 compliance, TLS 1.3 in transit, and AES-256 encryption at rest.`,
-        },
-        {
-          documentName: 'SOC2_Compliance_Security_Guardrails.docx',
-          chunkId: 'chunk_412',
-          score: 0.91,
-          text: `Role-based access control (RBAC) and immutable quantum audit trails ensure zero unauthorized data leaks across vectorized knowledge collections.`,
-        },
-      ];
-      setSearchResults(fallbackCitations);
-      toast('Vector Search Complete', `Found ${fallbackCitations.length} semantic matches in vector memory.`, 'info');
+      const errMsg = err?.response?.data?.detail || err?.message || 'Search request failed';
+      console.error('[Search] Vector search API error:', errMsg, err);
+      setSearchResults([]);
+      toast('Search Error', `Vector search failed: ${errMsg}`, 'error');
     } finally {
       setIsSearching(false);
     }
