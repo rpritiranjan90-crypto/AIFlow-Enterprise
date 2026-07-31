@@ -106,9 +106,29 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Could not attach DatabaseMetrics to engine sync_engine: %s", exc)
 
-    # 3. Create database tables
+    # 3. Enable pgvector extension FIRST (required before create_all on PostgreSQL),
+    #    then create all tables including vector_chunks with VECTOR(1536) column.
+    from sqlalchemy import text as sa_text
     async with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            try:
+                await conn.execute(sa_text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                logger.info("[Startup] pgvector extension enabled (CREATE EXTENSION IF NOT EXISTS vector)")
+            except Exception as pg_ext_err:
+                logger.warning(
+                    "[Startup] pgvector extension creation warning (may already exist): %s", pg_ext_err
+                )
         await conn.run_sync(Base.metadata.create_all)
+
+    # 4. Mark VectorStoreManager tables as initialized (startup just did it)
+    try:
+        from app.ai.vector_store import vector_store_manager
+        vector_store_manager._tables_initialized = True
+        logger.info(
+            "[Startup] VectorStoreManager tables confirmed: dialect=%s", engine.dialect.name
+        )
+    except Exception as e:
+        logger.warning("[Startup] Could not confirm VectorStoreManager tables: %s", e)
 
     # 4. Initialize Redis Cache
     try:
