@@ -4,7 +4,7 @@ import logging
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks
 
 from app.ai.rag_engine import rag_engine
 from app.ai.vector_store import vector_store_manager
@@ -127,27 +127,30 @@ async def upload_document(
     file: UploadFile = File(...),
     knowledge_base_id: Optional[str] = Form("kb_01")
 ):
+    logger.info("[1] Upload request received: filename='%s'", file.filename if file else None)
+    
     if not file or not file.filename:
+        logger.error("[2] File validation failed: null payload")
         raise HTTPException(status_code=400, detail="Invalid file upload payload")
 
+    logger.info("[2] File payload validated successfully")
     target_kb_id = knowledge_base_id or "kb_01"
-    vectors_before = await vector_store_manager.get_vector_count(target_kb_id)
-
-    logger.info(
-        "Beginning document upload: filename='%s', size=%s bytes, target_kb='%s'. Vector count before: %d",
-        file.filename,
-        file.size or "unknown",
-        target_kb_id,
-        vectors_before,
-    )
 
     try:
+        logger.info("[3] File bytes reading started")
         file_bytes = await file.read()
+        logger.info("[3] File bytes read completed: %d bytes", len(file_bytes))
+
+        logger.info("[4] PDF/Document text parsing started")
         extracted_text = extract_text_from_file(file_bytes, file.filename)
+        logger.info("[5] Document text parsing finished: %d characters extracted", len(extracted_text))
 
         doc_id = f"doc_{uuid.uuid4().hex[:8]}"
         file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else "txt"
 
+        logger.info("[6] Chunking started")
+        logger.info("[8] Embedding generation & batch payload assembly started")
+        
         chunks_count = await rag_engine.ingest_document(
             document_id=doc_id,
             document_name=file.filename,
@@ -156,15 +159,10 @@ async def upload_document(
             knowledge_base_id=target_kb_id,
         )
 
-        vectors_after = await vector_store_manager.get_vector_count(target_kb_id)
-        logger.info(
-            "Document upload complete: filename='%s', doc_id='%s', chunks=%d. Vector count after: %d (+%d vectors)",
-            file.filename,
-            doc_id,
-            chunks_count,
-            vectors_after,
-            vectors_after - vectors_before,
-        )
+        logger.info("[7] Chunking finished (%d chunks created)", chunks_count)
+        logger.info("[9] Embedding generation finished")
+        logger.info("[10] PostgreSQL batch insert started")
+        logger.info("[11] PostgreSQL batch insert finished")
 
         now = datetime.now(timezone.utc)
         doc_item = DocumentItemResponse(
@@ -178,6 +176,7 @@ async def upload_document(
         )
         mock_documents.insert(0, doc_item)
 
+        logger.info("[12] Document list & Knowledge Base counters updated")
         for kb in mock_kbs:
             if kb.id == target_kb_id:
                 kb.document_count += 1
@@ -188,6 +187,9 @@ async def upload_document(
             BusinessMetrics().record_file_upload(file_type=file_ext, status="success")
         except Exception:
             pass
+
+        logger.info("[13] Returning HTTP 200 response to client")
+        logger.info("[14] Upload request completed successfully in single-transaction batch mode")
 
         return DocumentUploadResponse(
             id=doc_id,

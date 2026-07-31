@@ -37,12 +37,16 @@ class VectorStoreManager:
 
     def __init__(self) -> None:
         self.provider = "pgvector"
+        self._tables_initialized = False
 
     async def _ensure_tables(self, session) -> None:
-        """Create tables if running in local test database."""
+        """Create tables once if running in local test database."""
+        if self._tables_initialized:
+            return
         try:
             conn = await session.connection()
             await conn.run_sync(Base.metadata.create_all)
+            self._tables_initialized = True
         except Exception as e:
             logger.debug("Table check fallback: %s", e)
 
@@ -53,37 +57,56 @@ class VectorStoreManager:
         embedding: List[float],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """INSERT document vector chunk into PostgreSQL vector_chunks table."""
-        meta = metadata or {}
-        kb_id = meta.get("knowledge_base_id", "kb_01")
-        doc_name = meta.get("document_name", "unknown")
+        """INSERT single document vector chunk into PostgreSQL vector_chunks table."""
+        return await self.index_documents_batch([
+            {
+                "document_id": document_id,
+                "content": content,
+                "embedding": embedding,
+                "metadata": metadata or {},
+            }
+        ])
+
+    async def index_documents_batch(
+        self,
+        chunks_data: List[Dict[str, Any]],
+    ) -> bool:
+        """Batch INSERT document vector chunks into PostgreSQL vector_chunks table in a single SQL transaction."""
+        if not chunks_data:
+            return True
 
         is_pg = engine.dialect.name == "postgresql"
-        chunk_record = VectorChunk(
-            id=f"vec_{uuid.uuid4().hex[:12]}",
-            document_id=document_id,
-            knowledge_base_id=kb_id,
-            document_name=doc_name,
-            content=content,
-            metadata_json=json.dumps(meta),
-            embedding=embedding if is_pg else json.dumps(embedding),
-        )
+        records = []
+        for item in chunks_data:
+            doc_id = item["document_id"]
+            content = item["content"]
+            embedding = item["embedding"]
+            meta = item.get("metadata", {})
+            kb_id = meta.get("knowledge_base_id", "kb_01")
+            doc_name = meta.get("document_name", "unknown")
+
+            records.append(
+                VectorChunk(
+                    id=f"vec_{uuid.uuid4().hex[:12]}",
+                    document_id=doc_id,
+                    knowledge_base_id=kb_id,
+                    document_name=doc_name,
+                    content=content,
+                    metadata_json=json.dumps(meta),
+                    embedding=embedding if is_pg else json.dumps(embedding),
+                )
+            )
 
         async with AsyncSessionLocal() as session:
             try:
                 await self._ensure_tables(session)
-                session.add(chunk_record)
+                session.add_all(records)
                 await session.commit()
-                logger.info(
-                    "INSERT INTO vector_chunks (pgvector): doc_id='%s', doc_name='%s', kb_id='%s'",
-                    document_id,
-                    doc_name,
-                    kb_id,
-                )
+                logger.info("Batch inserted %d vector chunks into PostgreSQL vector_chunks table.", len(records))
                 return True
             except Exception as e:
                 await session.rollback()
-                logger.error("Failed to insert pgvector document chunk: %s", e)
+                logger.error("Failed to batch insert pgvector document chunks: %s", e)
                 return False
 
     async def search(

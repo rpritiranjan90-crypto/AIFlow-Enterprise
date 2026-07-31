@@ -71,7 +71,7 @@ class RAGEngine:
         file_type: str = "pdf",
         knowledge_base_id: Optional[str] = None,
     ) -> int:
-        """Ingest document, chunk text, compute embeddings, and store in vector database."""
+        """Ingest document, chunk text, compute embeddings, and batch store in vector database."""
         chunks = self.chunk_document(content)
         kb_id = knowledge_base_id or "kb_01"
 
@@ -84,6 +84,7 @@ class RAGEngine:
             len(chunks),
         )
 
+        batch_payload = []
         for idx, chunk in enumerate(chunks):
             embedding = self.generate_embedding(chunk)
             chunk_id = f"{document_id}_chunk_{idx}"
@@ -94,14 +95,15 @@ class RAGEngine:
                 "chunk_index": idx,
                 "knowledge_base_id": kb_id,
             }
-            await vector_store_manager.index_document(
-                document_id=chunk_id,
-                content=chunk,
-                embedding=embedding,
-                metadata=metadata,
-            )
+            batch_payload.append({
+                "document_id": chunk_id,
+                "content": chunk,
+                "embedding": embedding,
+                "metadata": metadata,
+            })
 
-        logger.info("Successfully ingested document '%s' (%d chunks)", document_name, len(chunks))
+        await vector_store_manager.index_documents_batch(batch_payload)
+        logger.info("Successfully ingested document '%s' (%d chunks) via single transaction batch insert.", document_name, len(chunks))
         return len(chunks)
 
     async def search_vector_memory(
