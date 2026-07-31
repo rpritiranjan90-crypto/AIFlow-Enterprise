@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Knowledge Bases"])
 
-# Seed initial knowledge collections
 mock_kbs: List[KnowledgeBaseResponse] = [
     KnowledgeBaseResponse(
         id="kb_01",
@@ -48,58 +47,6 @@ mock_kbs: List[KnowledgeBaseResponse] = [
 ]
 
 mock_documents: List[DocumentItemResponse] = []
-
-
-def seed_initial_vectors():
-    """Seed initial sample document chunks into vector database if index is empty."""
-    if vector_store_manager.get_vector_count() == 0:
-        logger.info("Seeding initial knowledge base chunks into vector database...")
-        # Seed Architecture doc
-        arch_text = (
-            "AIFlow Enterprise provides high-throughput LLM routing, telemetry, and automated multi-agent coordination. "
-            "VPC topology employs isolated subnets, KMS envelope encryption, and mutual TLS for all microservice communication."
-        )
-        rag_engine.chunk_document(arch_text)
-        vector_store_manager.index_document(
-            document_id="doc_arch_01_chunk_0",
-            content=arch_text,
-            embedding=rag_engine.generate_embedding(arch_text),
-            metadata={"document_id": "doc_arch_01", "document_name": "AIFlow_Enterprise_Architecture.pdf", "knowledge_base_id": "kb_01", "file_type": "pdf"}
-        )
-
-        # Seed SOC2 doc
-        soc2_text = (
-            "SOC2 Type II compliance security guardrails require 24/7 audit logging, continuous secret scanning, "
-            "and strict role-based access control (RBAC) across all production Kubernetes clusters."
-        )
-        vector_store_manager.index_document(
-            document_id="doc_soc2_01_chunk_0",
-            content=soc2_text,
-            embedding=rag_engine.generate_embedding(soc2_text),
-            metadata={"document_id": "doc_soc2_01", "document_name": "SOC2_Compliance_Security_Guardrails.docx", "knowledge_base_id": "kb_01", "file_type": "docx"}
-        )
-
-        # Seed Pricing doc
-        pricing_text = (
-            "Enterprise Pricing Tier breakdown: Unlimited workflow executions, dedicated SLA with 99.99% uptime guarantee, "
-            "custom vector database connector integrations, and 24/7 priority support."
-        )
-        vector_store_manager.index_document(
-            document_id="doc_pricing_01_chunk_0",
-            content=pricing_text,
-            embedding=rag_engine.generate_embedding(pricing_text),
-            metadata={"document_id": "doc_pricing_01", "document_name": "Enterprise_Pricing_Tier_Battlecard.pdf", "knowledge_base_id": "kb_02", "file_type": "pdf"}
-        )
-
-        mock_documents.extend([
-            DocumentItemResponse(id="doc_arch_01", knowledge_base_id="kb_01", file_name="AIFlow_Enterprise_Architecture.pdf", file_type="pdf", chunk_count=1, status="indexed", created_at=datetime.now(timezone.utc)),
-            DocumentItemResponse(id="doc_soc2_01", knowledge_base_id="kb_01", file_name="SOC2_Compliance_Security_Guardrails.docx", file_type="docx", chunk_count=1, status="indexed", created_at=datetime.now(timezone.utc)),
-            DocumentItemResponse(id="doc_pricing_01", knowledge_base_id="kb_02", file_name="Enterprise_Pricing_Tier_Battlecard.pdf", file_type="pdf", chunk_count=1, status="indexed", created_at=datetime.now(timezone.utc)),
-        ])
-
-
-# Initialize vector seeds
-seed_initial_vectors()
 
 
 def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
@@ -130,7 +77,6 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
         except Exception as e:
             logger.warning(f"python-docx extraction failed for '{filename}': {e}")
 
-    # Text / UTF-8 fallback
     try:
         decoded = file_bytes.decode("utf-8")
         if decoded.strip():
@@ -185,7 +131,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Invalid file upload payload")
 
     target_kb_id = knowledge_base_id or "kb_01"
-    vectors_before = vector_store_manager.get_vector_count(target_kb_id)
+    vectors_before = await vector_store_manager.get_vector_count(target_kb_id)
 
     logger.info(
         "Beginning document upload: filename='%s', size=%s bytes, target_kb='%s'. Vector count before: %d",
@@ -210,7 +156,7 @@ async def upload_document(
             knowledge_base_id=target_kb_id,
         )
 
-        vectors_after = vector_store_manager.get_vector_count(target_kb_id)
+        vectors_after = await vector_store_manager.get_vector_count(target_kb_id)
         logger.info(
             "Document upload complete: filename='%s', doc_id='%s', chunks=%d. Vector count after: %d (+%d vectors)",
             file.filename,

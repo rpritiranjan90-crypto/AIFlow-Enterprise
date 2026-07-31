@@ -13,7 +13,7 @@ from app.ai.vector_store import vector_store_manager
 @pytest.mark.asyncio
 async def test_rag_end_to_end_ingestion_and_retrieval():
     kb_id = f"kb_test_{uuid.uuid4().hex[:6]}"
-    initial_vectors = vector_store_manager.get_vector_count(kb_id)
+    initial_vectors = await vector_store_manager.get_vector_count(kb_id)
 
     paper_content = (
         "Can AI Follow in Einstein's Footsteps? This research explores automated scientific discovery. "
@@ -35,7 +35,7 @@ async def test_rag_end_to_end_ingestion_and_retrieval():
 
     assert chunks_created > 0
 
-    vectors_after = vector_store_manager.get_vector_count(kb_id)
+    vectors_after = await vector_store_manager.get_vector_count(kb_id)
     assert vectors_after == initial_vectors + chunks_created
 
     test_queries = [

@@ -94,7 +94,7 @@ class RAGEngine:
                 "chunk_index": idx,
                 "knowledge_base_id": kb_id,
             }
-            vector_store_manager.index_document(
+            await vector_store_manager.index_document(
                 document_id=chunk_id,
                 content=chunk,
                 embedding=embedding,
@@ -121,7 +121,7 @@ class RAGEngine:
             top_k,
         )
 
-        search_results = vector_store_manager.search(
+        search_results = await vector_store_manager.search(
             query_embedding=query_embedding,
             top_k=top_k,
             metadata_filter=filter_dict,

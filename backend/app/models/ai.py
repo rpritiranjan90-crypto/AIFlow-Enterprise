@@ -48,13 +48,12 @@ class VectorChunk(Base):
     __tablename__ = "vector_chunks"
 
     id = Column(String, primary_key=True, default=lambda: f"vec_{uuid.uuid4().hex[:12]}")
-    document_id = Column(String, ForeignKey("knowledge_documents.id"), nullable=False)
-    knowledge_base_id = Column(String, ForeignKey("knowledge_bases.id"), nullable=False)
+    document_id = Column(String, nullable=False, index=True)
+    knowledge_base_id = Column(String, nullable=False, index=True)
     document_name = Column(String, nullable=True)
     content = Column(Text, nullable=False)
     metadata_json = Column(Text, nullable=True)
-    embedding = Column(Vector(1536), nullable=True)
-    embedding_json = Column(Text, nullable=True)
+    embedding = Column(Vector(1536).with_variant(Text, "sqlite"), nullable=False)
 
 class AgentSession(Base):
     __tablename__ = "agent_sessions"
