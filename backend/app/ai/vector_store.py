@@ -1,8 +1,8 @@
 """
-Production Persistent Vector Database Manager for AIFlow Enterprise.
+Production Enterprise Vector Store Manager for AIFlow Enterprise.
 
-Supports high-dimensional vector indexing, L2-normalized cosine similarity search,
-metadata filtering, collection isolation, and persistent disk storage across process restarts.
+Supports SQL-backed persistent vector storage, L2-normalized cosine similarity search,
+metadata filtering, and collection isolation across process restarts.
 """
 
 from dataclasses import dataclass
@@ -10,12 +10,13 @@ import json
 import math
 import os
 import re
+import sqlite3
 import logging
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-INDEX_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "vector_store_index.json")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "aiflow_vector_store.sqlite")
 
 
 @dataclass
@@ -27,39 +28,41 @@ class VectorSearchResult:
 
 
 class VectorStoreManager:
-    """Production Persistent Vector Database client supporting L2-normalized cosine similarity search."""
+    """Production Persistent SQL Vector Database client supporting L2 Cosine Similarity search."""
 
-    PROVIDERS = ["pinecone", "qdrant", "weaviate", "milvus", "chroma", "faiss"]
+    PROVIDERS = ["pinecone", "qdrant", "weaviate", "milvus", "chroma", "faiss", "pgvector"]
 
-    def __init__(self, provider: str = "faiss") -> None:
-        self.provider = provider.lower() if provider.lower() in self.PROVIDERS else "faiss"
-        self._in_memory_index: List[Dict[str, Any]] = []
-        self._load_from_disk()
+    def __init__(self, provider: str = "pgvector") -> None:
+        self.provider = provider.lower() if provider.lower() in self.PROVIDERS else "pgvector"
+        self._init_db()
 
     def _ensure_dir(self):
-        os.makedirs(os.path.dirname(INDEX_FILE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    def _load_from_disk(self):
-        """Load persistent vector index entries from disk."""
-        try:
-            self._ensure_dir()
-            if os.path.exists(INDEX_FILE_PATH):
-                with open(INDEX_FILE_PATH, "r", encoding="utf-8") as f:
-                    self._in_memory_index = json.load(f)
-                logger.info("Loaded %d vectors from persistent index at %s", len(self._in_memory_index), INDEX_FILE_PATH)
-        except Exception as e:
-            logger.warning("Failed to load vector index from disk: %s", e)
-            self._in_memory_index = []
+    def _get_connection(self):
+        self._ensure_dir()
+        return sqlite3.connect(DB_PATH)
 
-    def _save_to_disk(self):
-        """Persist current vector index entries to disk."""
+    def _init_db(self):
+        """Initialize persistent SQL table for vector chunks."""
         try:
-            self._ensure_dir()
-            with open(INDEX_FILE_PATH, "w", encoding="utf-8") as f:
-                json.dump(self._in_memory_index, f, indent=2)
-            logger.info("Saved %d vectors to persistent index at %s", len(self._in_memory_index), INDEX_FILE_PATH)
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS vector_chunks (
+                    document_id TEXT PRIMARY KEY,
+                    knowledge_base_id TEXT,
+                    document_name TEXT,
+                    content TEXT,
+                    embedding_json TEXT,
+                    metadata_json TEXT
+                )
+            """)
+            conn.commit()
+            conn.close()
+            logger.info("Initialized persistent SQL vector table at %s", DB_PATH)
         except Exception as e:
-            logger.error("Failed to save vector index to disk: %s", e)
+            logger.error("Failed to initialize vector SQL database: %s", e)
 
     def index_document(
         self,
@@ -68,29 +71,48 @@ class VectorStoreManager:
         embedding: List[float],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Insert or update document vector in persistent vector database."""
-        self._load_from_disk()
+        """Insert or update document vector in persistent SQL database."""
+        meta = metadata or {}
+        kb_id = meta.get("knowledge_base_id", "kb_01")
+        doc_name = meta.get("document_name", "unknown")
 
-        # Remove existing chunk if updating
-        self._in_memory_index = [x for x in self._in_memory_index if x.get("document_id") != document_id]
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO vector_chunks (document_id, knowledge_base_id, document_name, content, embedding_json, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(document_id) DO UPDATE SET
+                    knowledge_base_id=excluded.knowledge_base_id,
+                    document_name=excluded.document_name,
+                    content=excluded.content,
+                    embedding_json=excluded.embedding_json,
+                    metadata_json=excluded.metadata_json
+                """,
+                (
+                    document_id,
+                    kb_id,
+                    doc_name,
+                    content,
+                    json.dumps(embedding),
+                    json.dumps(meta),
+                ),
+            )
+            conn.commit()
+            conn.close()
 
-        entry = {
-            "document_id": document_id,
-            "content": content,
-            "embedding": embedding,
-            "metadata": metadata or {},
-        }
-        self._in_memory_index.append(entry)
-        self._save_to_disk()
-
-        logger.info(
-            "Indexed vector chunk '%s' for doc '%s' in provider '%s' (Total vectors in DB: %d)",
-            document_id,
-            (metadata or {}).get("document_name", "unknown"),
-            self.provider,
-            len(self._in_memory_index),
-        )
-        return True
+            total_vectors = self.get_vector_count()
+            logger.info(
+                "Indexed vector chunk '%s' for doc '%s' in SQL store (Total vectors: %d)",
+                document_id,
+                doc_name,
+                total_vectors,
+            )
+            return True
+        except Exception as e:
+            logger.error("Failed to index document vector chunk: %s", e)
+            return False
 
     def _cosine_similarity(self, vec_a: List[float], vec_b: List[float]) -> float:
         """Compute cosine similarity dot product between two L2-normalized vectors."""
@@ -111,55 +133,52 @@ class VectorStoreManager:
         metadata_filter: Optional[Dict[str, Any]] = None,
         query_text: Optional[str] = None,
     ) -> List[VectorSearchResult]:
-        """Perform semantic cosine similarity vector search with metadata filtering."""
-        self._load_from_disk()
-
-        logger.info(
-            "Executing vector search across %d total persistent vectors. Filter: %s",
-            len(self._in_memory_index),
-            metadata_filter,
-        )
-
+        """Perform semantic cosine similarity vector search against persistent SQL database."""
         candidates: List[VectorSearchResult] = []
 
-        for item in self._in_memory_index:
-            item_meta = item.get("metadata", {})
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
 
-            # Apply metadata filter (e.g. knowledge_base_id)
-            if metadata_filter:
-                match = True
-                for k, v in metadata_filter.items():
-                    if v is not None and item_meta.get(k) != v:
-                        match = False
-                        break
-                if not match:
-                    continue
+            kb_filter = (metadata_filter or {}).get("knowledge_base_id")
+            if kb_filter:
+                cursor.execute("SELECT document_id, content, embedding_json, metadata_json FROM vector_chunks WHERE knowledge_base_id = ?", (kb_filter,))
+            else:
+                cursor.execute("SELECT document_id, content, embedding_json, metadata_json FROM vector_chunks")
 
-            # Compute vector similarity score
-            score = self._cosine_similarity(query_embedding, item["embedding"])
+            rows = cursor.fetchall()
+            conn.close()
 
-            # Lexical keyword match boost if query_text is provided
-            if query_text:
-                q_words = set(re.findall(r'\w+', query_text.lower()))
-                c_words = set(re.findall(r'\w+', item["content"].lower()))
-                if q_words and c_words:
-                    overlap_ratio = len(q_words.intersection(c_words)) / len(q_words)
-                    score = max(score, overlap_ratio)
+            logger.info("Executing vector search across %d persistent SQL vectors. Filter: %s", len(rows), metadata_filter)
 
-            # Assign valid baseline score if in target collection
-            if score <= 0.0:
-                score = 0.50
+            for row in rows:
+                doc_id, content, emb_str, meta_str = row
+                embedding = json.loads(emb_str) if emb_str else []
+                item_meta = json.loads(meta_str) if meta_str else {}
 
-            candidates.append(
-                VectorSearchResult(
-                    document_id=item["document_id"],
-                    content=item["content"],
-                    score=round(float(score), 4),
-                    metadata=item_meta,
+                score = self._cosine_similarity(query_embedding, embedding)
+
+                if query_text:
+                    q_words = set(re.findall(r'\w+', query_text.lower()))
+                    c_words = set(re.findall(r'\w+', content.lower()))
+                    if q_words and c_words:
+                        overlap_ratio = len(q_words.intersection(c_words)) / len(q_words)
+                        score = max(score, overlap_ratio)
+
+                if score <= 0.0:
+                    score = 0.50
+
+                candidates.append(
+                    VectorSearchResult(
+                        document_id=doc_id,
+                        content=content,
+                        score=round(float(score), 4),
+                        metadata=item_meta,
+                    )
                 )
-            )
+        except Exception as e:
+            logger.error("Failed to query persistent SQL vector database: %s", e)
 
-        # Sort candidates by similarity score in descending order
         candidates.sort(key=lambda x: x.score, reverse=True)
 
         logger.info(
@@ -180,11 +199,20 @@ class VectorStoreManager:
         return candidates[:top_k]
 
     def get_vector_count(self, knowledge_base_id: Optional[str] = None) -> int:
-        """Return total vector count in index for a knowledge base."""
-        self._load_from_disk()
-        if not knowledge_base_id:
-            return len(self._in_memory_index)
-        return sum(1 for item in self._in_memory_index if item.get("metadata", {}).get("knowledge_base_id") == knowledge_base_id)
+        """Return total vector count in persistent SQL database."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            if knowledge_base_id:
+                cursor.execute("SELECT COUNT(*) FROM vector_chunks WHERE knowledge_base_id = ?", (knowledge_base_id,))
+            else:
+                cursor.execute("SELECT COUNT(*) FROM vector_chunks")
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error("Failed to get vector count from database: %s", e)
+            return 0
 
 
 vector_store_manager = VectorStoreManager()
