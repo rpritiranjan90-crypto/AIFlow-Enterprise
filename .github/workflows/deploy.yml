@@ -24,6 +24,9 @@ jobs:
           pip install -r backend/requirements.txt pytest pytest-asyncio
 
       - name: Run Backend Pytest Suite
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          JWT_SECRET_KEY: test-secret-key-super-secure-for-ci
         run: |
           cd backend
           python -m pytest tests/

@@ -53,7 +53,7 @@ jobs:
 
       - name: Run Backend App Health Check Test
         env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@localhost:5432/aiflow_test_db
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
           JWT_SECRET_KEY: test-secret-key-super-secure-for-ci
         run: |
           cd backend
