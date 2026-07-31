@@ -123,7 +123,8 @@ class VectorStoreManager:
         FROM vector_chunks WHERE knowledge_base_id = :kb_id
         ORDER BY embedding <=> :query_embedding LIMIT :top_k;
         """
-        kb_id = (metadata_filter or {}).get("knowledge_base_id")
+        raw_kb_id = (metadata_filter or {}).get("knowledge_base_id")
+        kb_id = raw_kb_id if raw_kb_id not in ["all", "", "none", "undefined", "null"] else None
 
         async with AsyncSessionLocal() as session:
             try:
@@ -201,7 +202,7 @@ class VectorStoreManager:
                     candidates.sort(key=lambda x: x.score, reverse=True)
                     candidates = candidates[:top_k]
 
-                logger.info("Executed pgvector search query. Returned %d rows.", len(candidates))
+                logger.info("Executed pgvector search query (kb_id='%s'). Returned %d rows.", kb_id, len(candidates))
                 return candidates
             except Exception as e:
                 logger.error("Failed to execute pgvector search query: %s", e)
@@ -209,12 +210,15 @@ class VectorStoreManager:
 
     async def get_vector_count(self, knowledge_base_id: Optional[str] = None) -> int:
         """Return total vector count in PostgreSQL vector_chunks table."""
+        raw_kb_id = knowledge_base_id
+        kb_id = raw_kb_id if raw_kb_id not in ["all", "", "none", "undefined", "null"] else None
+
         async with AsyncSessionLocal() as session:
             try:
                 await self._ensure_tables(session)
                 stmt = select(func.count(VectorChunk.id))
-                if knowledge_base_id:
-                    stmt = stmt.where(VectorChunk.knowledge_base_id == knowledge_base_id)
+                if kb_id:
+                    stmt = stmt.where(VectorChunk.knowledge_base_id == kb_id)
                 result = await session.execute(stmt)
                 return result.scalar() or 0
             except Exception as e:

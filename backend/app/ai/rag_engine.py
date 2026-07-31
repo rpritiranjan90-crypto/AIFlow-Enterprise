@@ -8,6 +8,7 @@ high-dimensional vector embedding generation, hybrid vector search, and citation
 from dataclasses import dataclass
 import math
 import re
+import zlib
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -44,7 +45,7 @@ class RAGEngine:
     def generate_embedding(self, text: str) -> List[float]:
         """
         Generate L2-normalized 1536-dimensional semantic vector embedding.
-        Uses deterministic subword hash binning with term-frequency weighting.
+        Uses deterministic CRC32 hash binning for zero-drift cross-process vector matching.
         """
         words = re.findall(r'\w+', text.lower())
         vec = [0.0] * 1536
@@ -52,8 +53,8 @@ class RAGEngine:
             return vec
 
         for word in words:
-            # Map hash to index in 1536-dim vector space
-            idx = abs(hash(word)) % 1536
+            # Deterministic CRC32 hash binning across 1536 dimensions
+            idx = zlib.crc32(word.encode('utf-8')) % 1536
             vec[idx] += 1.0
 
         # L2 Normalize
@@ -114,12 +115,18 @@ class RAGEngine:
     ) -> List[KnowledgeCitation]:
         """Perform semantic hybrid vector search against indexed document chunks."""
         query_embedding = self.generate_embedding(query)
-        filter_dict = {"knowledge_base_id": knowledge_base_id} if knowledge_base_id else None
+        
+        # Normalize knowledge base filter
+        clean_kb_id = knowledge_base_id
+        if clean_kb_id in ["all", "", "none", "undefined", "null"]:
+            clean_kb_id = None
+
+        filter_dict = {"knowledge_base_id": clean_kb_id} if clean_kb_id else None
 
         logger.info(
             "Searching vector memory for query: '%s' (KB: %s, Top K: %d)",
             query,
-            knowledge_base_id,
+            clean_kb_id,
             top_k,
         )
 
