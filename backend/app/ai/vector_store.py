@@ -1,17 +1,21 @@
 """
-Production Vector Database Manager for AIFlow Enterprise.
+Production Persistent Vector Database Manager for AIFlow Enterprise.
 
 Supports high-dimensional vector indexing, L2-normalized cosine similarity search,
-metadata filtering, and collection/namespace isolation.
+metadata filtering, collection isolation, and persistent disk storage across process restarts.
 """
 
 from dataclasses import dataclass
+import json
 import math
+import os
 import re
 import logging
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+INDEX_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "vector_store_index.json")
 
 
 @dataclass
@@ -23,13 +27,39 @@ class VectorSearchResult:
 
 
 class VectorStoreManager:
-    """Production Vector Database client supporting L2-normalized cosine similarity search."""
+    """Production Persistent Vector Database client supporting L2-normalized cosine similarity search."""
 
     PROVIDERS = ["pinecone", "qdrant", "weaviate", "milvus", "chroma", "faiss"]
 
     def __init__(self, provider: str = "faiss") -> None:
         self.provider = provider.lower() if provider.lower() in self.PROVIDERS else "faiss"
         self._in_memory_index: List[Dict[str, Any]] = []
+        self._load_from_disk()
+
+    def _ensure_dir(self):
+        os.makedirs(os.path.dirname(INDEX_FILE_PATH), exist_ok=True)
+
+    def _load_from_disk(self):
+        """Load persistent vector index entries from disk."""
+        try:
+            self._ensure_dir()
+            if os.path.exists(INDEX_FILE_PATH):
+                with open(INDEX_FILE_PATH, "r", encoding="utf-8") as f:
+                    self._in_memory_index = json.load(f)
+                logger.info("Loaded %d vectors from persistent index at %s", len(self._in_memory_index), INDEX_FILE_PATH)
+        except Exception as e:
+            logger.warning("Failed to load vector index from disk: %s", e)
+            self._in_memory_index = []
+
+    def _save_to_disk(self):
+        """Persist current vector index entries to disk."""
+        try:
+            self._ensure_dir()
+            with open(INDEX_FILE_PATH, "w", encoding="utf-8") as f:
+                json.dump(self._in_memory_index, f, indent=2)
+            logger.info("Saved %d vectors to persistent index at %s", len(self._in_memory_index), INDEX_FILE_PATH)
+        except Exception as e:
+            logger.error("Failed to save vector index to disk: %s", e)
 
     def index_document(
         self,
@@ -38,7 +68,12 @@ class VectorStoreManager:
         embedding: List[float],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Insert or update document vector in vector database."""
+        """Insert or update document vector in persistent vector database."""
+        self._load_from_disk()
+
+        # Remove existing chunk if updating
+        self._in_memory_index = [x for x in self._in_memory_index if x.get("document_id") != document_id]
+
         entry = {
             "document_id": document_id,
             "content": content,
@@ -46,6 +81,8 @@ class VectorStoreManager:
             "metadata": metadata or {},
         }
         self._in_memory_index.append(entry)
+        self._save_to_disk()
+
         logger.info(
             "Indexed vector chunk '%s' for doc '%s' in provider '%s' (Total vectors in DB: %d)",
             document_id,
@@ -75,8 +112,10 @@ class VectorStoreManager:
         query_text: Optional[str] = None,
     ) -> List[VectorSearchResult]:
         """Perform semantic cosine similarity vector search with metadata filtering."""
+        self._load_from_disk()
+
         logger.info(
-            "Executing vector search across %d total vectors. Filter: %s",
+            "Executing vector search across %d total persistent vectors. Filter: %s",
             len(self._in_memory_index),
             metadata_filter,
         )
@@ -142,6 +181,7 @@ class VectorStoreManager:
 
     def get_vector_count(self, knowledge_base_id: Optional[str] = None) -> int:
         """Return total vector count in index for a knowledge base."""
+        self._load_from_disk()
         if not knowledge_base_id:
             return len(self._in_memory_index)
         return sum(1 for item in self._in_memory_index if item.get("metadata", {}).get("knowledge_base_id") == knowledge_base_id)
