@@ -4,10 +4,14 @@ import logging
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException, BackgroundTasks, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.ai.rag_engine import rag_engine
 from app.ai.vector_store import vector_store_manager
+from app.core.database import get_db
+from app.models.ai import KnowledgeBase, KnowledgeDocument
 from app.monitoring.business_metrics import BusinessMetrics
 from app.schemas.ai import (
     CitationItem,
@@ -22,31 +26,6 @@ from app.schemas.ai import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Knowledge Bases"])
-
-mock_kbs: List[KnowledgeBaseResponse] = [
-    KnowledgeBaseResponse(
-        id="kb_01",
-        workspace_id="ws_prod_01",
-        name="Enterprise Architecture & Security",
-        description="Core SOC2 compliance guidelines, VPC topologies, and database schemas",
-        tags="Engineering,Security",
-        document_count=2,
-        vector_count=2,
-        created_at=datetime.now(timezone.utc),
-    ),
-    KnowledgeBaseResponse(
-        id="kb_02",
-        workspace_id="ws_prod_01",
-        name="Sales Playbook & Product Specs",
-        description="Pricing tier breakdown, competitive battlecards, and SLA commitments",
-        tags="Sales,Product",
-        document_count=1,
-        vector_count=1,
-        created_at=datetime.now(timezone.utc),
-    ),
-]
-
-mock_documents: List[DocumentItemResponse] = []
 
 
 def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
@@ -95,13 +74,42 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
 
 
 @router.get("/knowledge-bases", response_model=List[KnowledgeBaseResponse])
-async def list_knowledge_bases():
-    return mock_kbs
+async def list_knowledge_bases(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(KnowledgeBase))
+    kbs = result.scalars().all()
+    if not kbs:
+        # Seed default knowledge bases to prevent blank state
+        kb1 = KnowledgeBase(
+            id="kb_01",
+            workspace_id="ws_prod_01",
+            name="Enterprise Architecture & Security",
+            description="Core SOC2 compliance guidelines, VPC topologies, and database schemas",
+            tags="Engineering,Security",
+            document_count=0,
+            vector_count=0,
+            created_at=datetime.utcnow(),
+        )
+        kb2 = KnowledgeBase(
+            id="kb_02",
+            workspace_id="ws_prod_01",
+            name="Sales Playbook & Product Specs",
+            description="Pricing tier breakdown, competitive battlecards, and SLA commitments",
+            tags="Sales,Product",
+            document_count=0,
+            vector_count=0,
+            created_at=datetime.utcnow(),
+        )
+        db.add(kb1)
+        db.add(kb2)
+        await db.commit()
+        result = await db.execute(select(KnowledgeBase))
+        kbs = result.scalars().all()
+    return kbs
 
 
 @router.post("/knowledge-bases", response_model=KnowledgeBaseResponse)
-async def create_knowledge_base(body: KnowledgeBaseCreateRequest):
-    new_kb = KnowledgeBaseResponse(
+async def create_knowledge_base(body: KnowledgeBaseCreateRequest, db: AsyncSession = Depends(get_db)):
+    new_kb = KnowledgeBase(
         id=f"kb_{uuid.uuid4().hex[:6]}",
         workspace_id="ws_prod_01",
         name=body.name,
@@ -109,23 +117,41 @@ async def create_knowledge_base(body: KnowledgeBaseCreateRequest):
         tags=body.tags or "General",
         document_count=0,
         vector_count=0,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.utcnow(),
     )
-    mock_kbs.append(new_kb)
+    db.add(new_kb)
+    await db.commit()
+    await db.refresh(new_kb)
     return new_kb
 
 
 @router.get("/documents", response_model=List[DocumentItemResponse])
-async def list_documents(knowledge_base_id: Optional[str] = None):
+async def list_documents(knowledge_base_id: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    stmt = select(KnowledgeDocument)
     if knowledge_base_id:
-        return [doc for doc in mock_documents if doc.knowledge_base_id == knowledge_base_id]
-    return mock_documents
+        stmt = stmt.where(KnowledgeDocument.knowledge_base_id == knowledge_base_id)
+    stmt = stmt.order_by(KnowledgeDocument.created_at.desc())
+    result = await db.execute(stmt)
+    docs = result.scalars().all()
+    return [
+        DocumentItemResponse(
+            id=doc.id,
+            knowledge_base_id=doc.knowledge_base_id,
+            file_name=doc.file_name,
+            file_type=doc.file_type,
+            chunk_count=doc.chunk_count,
+            status=doc.status,
+            created_at=doc.created_at,
+        )
+        for doc in docs
+    ]
 
 
 @router.post("/documents/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    knowledge_base_id: Optional[str] = Form("kb_01")
+    knowledge_base_id: Optional[str] = Form("kb_01"),
+    db: AsyncSession = Depends(get_db),
 ):
     logger.info("[1] Upload request received: filename='%s'", file.filename if file else None)
     
@@ -164,24 +190,39 @@ async def upload_document(
         logger.info("[10] PostgreSQL batch insert started")
         logger.info("[11] PostgreSQL batch insert finished")
 
-        now = datetime.now(timezone.utc)
-        doc_item = DocumentItemResponse(
+        now = datetime.utcnow()
+        doc_item = KnowledgeDocument(
             id=doc_id,
             knowledge_base_id=target_kb_id,
             file_name=file.filename,
             file_type=file_ext,
-            chunk_count=chunks_count,
+            file_size=len(file_bytes),
             status="indexed",
+            chunk_count=chunks_count,
             created_at=now,
         )
-        mock_documents.insert(0, doc_item)
+        db.add(doc_item)
 
-        logger.info("[12] Document list & Knowledge Base counters updated")
-        for kb in mock_kbs:
-            if kb.id == target_kb_id:
-                kb.document_count += 1
-                kb.vector_count += chunks_count
-                break
+        # Update KB counters dynamically
+        kb_result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == target_kb_id))
+        kb = kb_result.scalar_one_or_none()
+        if kb:
+            kb.document_count += 1
+            kb.vector_count += chunks_count
+        else:
+            # Create knowledge base if not found
+            kb = KnowledgeBase(
+                id=target_kb_id,
+                workspace_id="ws_prod_01",
+                name="Auto-Generated Collection",
+                tags="General",
+                document_count=1,
+                vector_count=chunks_count,
+                created_at=now,
+            )
+            db.add(kb)
+
+        await db.commit()
 
         try:
             BusinessMetrics().record_file_upload(file_type=file_ext, status="success")
