@@ -20,64 +20,13 @@ interface DocumentItem {
   created_at: string;
 }
 
-const DEFAULT_KNOWLEDGE_BASES: KnowledgeBaseItem[] = [
-  {
-    id: 'kb_01',
-    name: 'Enterprise Architecture & Security',
-    description: 'Core SOC2 compliance guidelines, VPC topologies, and database schemas',
-    tags: 'Engineering,Security',
-    documentCount: 2,
-    vectorCount: 1420,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'kb_02',
-    name: 'Sales Playbook & Product Specs',
-    description: 'Pricing tier breakdown, competitive battlecards, and SLA commitments',
-    tags: 'Sales,Product',
-    documentCount: 1,
-    vectorCount: 850,
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const DEFAULT_DOCUMENTS: DocumentItem[] = [
-  {
-    id: 'doc_arch_01',
-    knowledge_base_id: 'kb_01',
-    file_name: 'AIFlow_Enterprise_Architecture.pdf',
-    file_type: 'pdf',
-    chunk_count: 42,
-    status: 'indexed',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'doc_soc2_01',
-    knowledge_base_id: 'kb_01',
-    file_name: 'SOC2_Compliance_Security_Guardrails.docx',
-    file_type: 'docx',
-    chunk_count: 28,
-    status: 'indexed',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'doc_pricing_01',
-    knowledge_base_id: 'kb_02',
-    file_name: 'Enterprise_Pricing_Tier_Battlecard.pdf',
-    file_type: 'pdf',
-    chunk_count: 18,
-    status: 'indexed',
-    created_at: new Date().toISOString(),
-  },
-];
-
 export const KnowledgeBasePage: React.FC = () => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState('kb');
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>(DEFAULT_KNOWLEDGE_BASES);
-  const [documents, setDocuments] = useState<DocumentItem[]>(DEFAULT_DOCUMENTS);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
   // Upload States
   const [isUploading, setIsUploading] = useState(false);
@@ -98,7 +47,7 @@ export const KnowledgeBasePage: React.FC = () => {
   const [newKbTags, setNewKbTags] = useState('Engineering,Security');
   const [isCreatingKb, setIsCreatingKb] = useState(false);
 
-  // Fetch Knowledge Bases & Documents from API Gateway with graceful fallback
+  // Fetch Knowledge Bases & Documents from API Gateway
   const fetchKnowledgeData = async () => {
     try {
       const [kbRes, docRes] = await Promise.allSettled([
@@ -106,7 +55,7 @@ export const KnowledgeBasePage: React.FC = () => {
         apiClient.get('/documents'),
       ]);
 
-      if (kbRes.status === 'fulfilled' && Array.isArray(kbRes.value.data) && kbRes.value.data.length > 0) {
+      if (kbRes.status === 'fulfilled' && Array.isArray(kbRes.value.data)) {
         const formattedKbs: KnowledgeBaseItem[] = kbRes.value.data.map((kb: any) => ({
           id: kb.id,
           name: kb.name,
@@ -119,11 +68,11 @@ export const KnowledgeBasePage: React.FC = () => {
         setKnowledgeBases(formattedKbs);
       }
 
-      if (docRes.status === 'fulfilled' && Array.isArray(docRes.value.data) && docRes.value.data.length > 0) {
+      if (docRes.status === 'fulfilled' && Array.isArray(docRes.value.data)) {
         setDocuments(docRes.value.data);
       }
     } catch (err: any) {
-      console.warn('API fetch warning, retaining loaded knowledge base items:', err);
+      console.warn('API fetch warning:', err);
     }
   };
 

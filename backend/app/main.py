@@ -106,19 +106,52 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Could not attach DatabaseMetrics to engine sync_engine: %s", exc)
 
-    # 3. Enable pgvector extension FIRST (required before create_all on PostgreSQL),
-    #    then create all tables including vector_chunks with VECTOR(1536) column.
+    # 3. Verify connection, check PostgreSQL version, and configure pgvector & HNSW index
     from sqlalchemy import text as sa_text
-    async with engine.begin() as conn:
-        if engine.dialect.name == "postgresql":
-            try:
-                await conn.execute(sa_text("CREATE EXTENSION IF NOT EXISTS vector;"))
-                logger.info("[Startup] pgvector extension enabled (CREATE EXTENSION IF NOT EXISTS vector)")
-            except Exception as pg_ext_err:
-                logger.warning(
-                    "[Startup] pgvector extension creation warning (may already exist): %s", pg_ext_err
-                )
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            # Basic connection check
+            await conn.execute(sa_text("SELECT 1;"))
+            logger.info("[Startup] Database connection verified successfully.")
+
+            if engine.dialect.name == "postgresql":
+                # PostgreSQL version check
+                pg_ver_res = await conn.execute(sa_text("SELECT version();"))
+                pg_version = pg_ver_res.scalar()
+                logger.info(f"[Startup] PostgreSQL Version: {pg_version}")
+
+                # Enable pgvector extension
+                try:
+                    await conn.execute(sa_text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                    logger.info("[Startup] pgvector extension enabled.")
+                except Exception as pg_ext_err:
+                    logger.critical(f"[Startup] Failed to enable pgvector extension: {pg_ext_err}")
+                    if settings.ENVIRONMENT == "production":
+                        raise RuntimeError(f"pgvector extension is missing and required in production: {pg_ext_err}") from pg_ext_err
+
+                # Perform table generation
+                await conn.run_sync(Base.metadata.create_all)
+                logger.info("[Startup] Database tables ensured via create_all.")
+
+                # Ensure HNSW Index is built
+                try:
+                    await conn.execute(sa_text("""
+                        CREATE INDEX IF NOT EXISTS vector_chunks_embedding_hnsw
+                        ON vector_chunks
+                        USING hnsw (embedding vector_cosine_ops);
+                    """))
+                    logger.info("[Startup] pgvector HNSW index verified and/or created successfully.")
+                except Exception as idx_err:
+                    logger.warning(f"[Startup] HNSW index creation/verification warning: {idx_err}")
+            else:
+                # SQLite table generation
+                await conn.run_sync(Base.metadata.create_all)
+                logger.info("[Startup] SQLite tables ensured via create_all.")
+
+    except Exception as exc:
+        logger.critical(f"[Startup] Fatal database connection/validation error during startup: {exc}", exc_info=True)
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError(f"Aborting application startup due to database validation failure: {exc}") from exc
 
     # 4. Mark VectorStoreManager tables as initialized (startup just did it)
     try:
